@@ -30,6 +30,9 @@ REQUIRED_KEYS = {
     "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY"),
 }
 
+# Configure OpenAI
+openai.api_key = REQUIRED_KEYS["OPENAI_API_KEY"]
+
 def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
     """Check if there is an active internet connection"""
     try:
@@ -40,7 +43,6 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
 
 def setup_openai_client():
     """Configure OpenAI client with retry mechanism"""
-    # Create session with retry strategy
     session = requests.Session()
     retries = Retry(
         total=5,
@@ -50,9 +52,6 @@ def setup_openai_client():
     )
     adapter = HTTPAdapter(max_retries=retries)
     session.mount("https://", adapter)
-    
-    # Configure OpenAI
-    openai.api_key = REQUIRED_KEYS["OPENAI_API_KEY"]
     openai.requestssession = session
 
 # Initialize session state
@@ -113,7 +112,7 @@ class SecurityAnalyzer:
         
     def create_enhanced_prompt(self, code: str) -> str:
         """Create an enhanced security analysis prompt focused on clear explanations"""
-        return f"""You are a PHP security expert who specializes in explaining security issues to non-technical users. Analyze the following code and identify security vulnerabilities.
+        return f"""You are a security expert who specializes in explaining security issues to non-technical users. Analyze the following code and identify security vulnerabilities.
 
 When you find a vulnerability:
 
@@ -244,10 +243,14 @@ Format each vulnerability like this:
             return "Unable to connect to the API service. Please check your internet connection or DNS settings."
         elif isinstance(error, requests.exceptions.ConnectionError):
             return "Connection failed. Please check your internet connection and try again."
-        elif isinstance(error, openai.error.APIError):
+        elif isinstance(error, openai.APIError):
             return "The API service is temporarily unavailable. Please try again in a few minutes."
-        elif isinstance(error, openai.error.Timeout):
+        elif isinstance(error, openai.APITimeoutError):
             return "The request timed out. Please try again."
+        elif isinstance(error, openai.RateLimitError):
+            return "Rate limit exceeded. Please wait a moment before trying again."
+        elif isinstance(error, openai.APIConnectionError):
+            return "Connection to OpenAI failed. Please check your internet connection."
         else:
             return f"An unexpected error occurred: {str(error)}"
 
@@ -269,7 +272,7 @@ def process_analysis_request(analyzer: SecurityAnalyzer, code: str, query: str, 
 
 def main():
     st.set_page_config(
-        page_title="PHP Code Security Checker",
+        page_title="CodeGuardianAI",
         layout="wide",
         initial_sidebar_state="expanded"
     )
@@ -301,13 +304,13 @@ def main():
         st.error("⚠️ Cannot reach OpenAI API. This might be due to DNS issues or network restrictions.")
 
     # UI Design
-    st.title("PHP Code Security Checker")
+    st.title("CodeGuardianAI")
     
     col1, col2 = st.columns([2,1])
     with col1:
         st.markdown("""
         ### What This Tool Does:
-        1. 🔍 **Scans Your Code:** Checks every line of your PHP code for security problems
+        1. 🔍 **Scans Your Code:** Checks every line of your code for security problems
         2. 📝 **Simple Explanations:** Describes issues in easy-to-understand terms
         3. 🎯 **Shows Exact Problems:** Highlights exactly where the issues are in your code
         4. 🛠️ **Provides Solutions:** Gives you step-by-step instructions to fix each issue
@@ -328,8 +331,8 @@ def main():
         st.header("Settings")
         
         uploaded_file = st.file_uploader(
-            "Upload PHP File",
-            type=["php", "txt"],
+            "Upload Code File",
+            type=["php", "txt", "py", "js", "java", "cpp", "cs"],
             help="Maximum file size: 100KB"
         )
 
@@ -342,7 +345,7 @@ def main():
                     st.session_state.php_code = file_content
                     st.success("Code uploaded successfully!")
                     with st.expander("View Uploaded Code"):
-                        st.code(st.session_state.php_code, language="php")
+                        st.code(st.session_state.php_code, language=uploaded_file.name.split('.')[-1])
             except Exception as e:
                 st.error(f"Error reading file: {str(e)}")
 
@@ -380,13 +383,13 @@ def main():
                             analyzer,
                             st.session_state.php_code,
                             query,
-                            "OpenAI"  # We're only using OpenAI now
+                            "OpenAI"
                         )
                         st.markdown(result)
                     except Exception as e:
                         st.error(f"Error during analysis: {str(e)}")
     else:
-        st.warning("⬅️ Please upload your PHP code using the sidebar to begin analysis")
+        st.warning("⬅️ Please upload your code using the sidebar to begin analysis")
 
 if __name__ == "__main__":
     main()
