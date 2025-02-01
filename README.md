@@ -15,8 +15,8 @@ A powerful and user-friendly tool that analyzes PHP code for security vulnerabil
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/php-security-analyzer.git
-cd php-security-analyzer
+git clone https://github.com/Btr4k/CodeGuardianAI.git
+cd CodeGuardianAI
 ```
 
 2. Create a virtual environment (recommended):
@@ -97,4 +97,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Support
 
-If you encounter any issues or have questions, please file an issue on the GitHub repository.
+If you encounter any issues or have questions, please file an issue on the GitHub repository, or X: @A_cyb3r
