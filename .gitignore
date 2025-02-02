@@ -1,7 +1,25 @@
+# Environment variables
 .env
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
 venv/
+ENV/
+
+# Logs
+*.log
+security_analyzer.log
+
+# IDE specific files
 .vscode/
 .idea/
-*.log
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db

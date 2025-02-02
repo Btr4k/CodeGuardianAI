@@ -1,100 +1,91 @@
-# PHP Security Code Analyzer
+# CodeGuardianAI
 
-A powerful and user-friendly tool that analyzes PHP code for security vulnerabilities using OpenAI's GPT-4. The tool provides detailed explanations and fixes for identified security issues in plain language.
+An AI-powered code security analyzer that helps identify and fix security vulnerabilities in your code.
 
-## Features
+## 🚀 Quick Start
 
-- 🔍 **Comprehensive Security Analysis**: Scans PHP code for various security vulnerabilities
-- 💡 **User-Friendly Explanations**: Provides clear, non-technical explanations of security issues
-- 🎯 **Precise Problem Location**: Highlights exact lines where vulnerabilities exist
-- 🛠️ **Solution-Oriented**: Offers step-by-step fixes with example code
-- 💾 **Result Caching**: Saves analysis results to prevent redundant API calls
-- 🔄 **Retry Mechanism**: Handles network issues gracefully with automatic retries
+### Prerequisites
+- Python 3.9 or higher
+- Git
+- OpenAI API key
 
-## Installation
+### Installation Steps
 
-1. Clone the repository:
+1. **Clone the repository:**
 ```bash
 git clone https://github.com/Btr4k/CodeGuardianAI.git
 cd CodeGuardianAI
 ```
 
-2. Create a virtual environment (recommended):
+2. **Run the setup script:**
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python setup.py
+```
+This will:
+- Create a virtual environment
+- Install all dependencies
+- Set up the configuration file
+
+3. **Activate the virtual environment:**
+```bash
+# For Windows
+venv\Scripts\activate
+
+# For Linux/Mac
+source venv/bin/activate
 ```
 
-3. Install the required packages:
-```bash
-pip install -r requirements.txt
-```
-
-4. Create a `.env` file in the project root and add your OpenAI API key:
+4. **Configure your OpenAI API key:**
+Edit the `.env` file and add your OpenAI API key:
 ```env
-OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_API_KEY=your_api_key_here
 ```
 
-## Usage
-
-1. Start the application:
+5. **Run the application:**
 ```bash
 streamlit run app.py
 ```
 
-2. Upload your PHP file using the sidebar interface
+### Common Issues & Solutions
 
-3. Choose your analysis type:
-   - **Full Security Scan**: Comprehensive analysis of all security aspects
-   - **Custom Query**: Ask specific security-related questions about your code
+If you encounter: `module 'openai' has no attribute 'error'`
+```bash
+pip uninstall openai
+pip install openai==0.28.0
+```
 
-4. View the results with:
-   - Vulnerability descriptions in plain language
-   - Line-by-line problem identification
-   - Practical fix suggestions
-   - Working code examples
+## 🛠️ Features
 
-## Requirements
+- Deep code analysis for security vulnerabilities
+- Support for multiple programming languages
+- Clear, non-technical explanations of issues
+- Step-by-step fix instructions
+- Code examples for secure implementations
 
-- Python 3.9+
-- OpenAI API key
-- Internet connection
-- Required Python packages (see requirements.txt)
+## 📝 Usage
 
-## Vulnerability Categories Detected
+1. Start the application
+2. Upload your code file
+3. Choose analysis type:
+   - Full Security Scan
+   - Custom Query
+4. Review results and implement fixes
 
-- SQL Injection
-- Cross-Site Scripting (XSS)
-- Command Injection
-- File Upload Vulnerabilities
-- Authentication Issues
-- Authorization Problems
-- Input Validation Weaknesses
-- And more...
+## 🔒 Supported Languages
 
-## Error Handling
+- PHP
+- Python
+- JavaScript
+- Java
+- C++
+- C#
+- Text files
 
-The tool includes robust error handling for:
-- Network connectivity issues
-- API timeouts
-- DNS resolution problems
-- File size limitations
-- Invalid input detection
+## ⚙️ Configuration
 
-## Contributing
+Maximum file size: 200MB
+Supported file extensions: .php, .py, .js, .java, .cpp, .cs, .txt
+
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- OpenAI for providing the GPT-4 API
-- Streamlit for the wonderful web framework
-- Python community for the excellent packages
-
-## Support
-
-If you encounter any issues or have questions, please file an issue on the GitHub repository, or X: @A_cyb3r
