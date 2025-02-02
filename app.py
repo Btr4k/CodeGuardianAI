@@ -69,6 +69,7 @@ def initialize_session_state():
 
 class SecurityAnalyzer:
     def __init__(self):
+        # Core vulnerability categories
         self.vulnerability_categories = {
             "injection": [
                 "SQL Injection",
@@ -107,12 +108,88 @@ class SecurityAnalyzer:
                 "Missing Input Validation",
                 "Insufficient Input Sanitization",
                 "File Upload Vulnerabilities"
+            ],
+            # Additional advanced security checks
+            "docker_security": [
+                "Dockerfile Best Practices",
+                "Container Vulnerabilities",
+                "Base Image Security",
+                "Docker Compose Security",
+                "Runtime Security"
+            ],
+            "api_security": [
+                "API Authentication",
+                "Rate Limiting",
+                "API Input Validation",
+                "API Access Control",
+                "API Response Security"
+            ],
+            "dependency_check": [
+                "Known CVE Vulnerabilities",
+                "Outdated Package Detection",
+                "Dependency Chain Analysis",
+                "License Compliance",
+                "Version Compatibility"
+            ],
+            "compliance": [
+                "GDPR Compliance",
+                "HIPAA Requirements",
+                "PCI DSS Standards",
+                "SOC 2 Controls",
+                "ISO 27001 Requirements"
+            ],
+            "secret_detection": [
+                "API Key Detection",
+                "Credential Scanning",
+                "Token Identification",
+                "Password Pattern Detection",
+                "Environment Variable Security"
+            ],
+            "cloud_security": [
+                "Cloud Configuration",
+                "IAM Best Practices",
+                "Storage Security",
+                "Network Security",
+                "Serverless Security"
             ]
         }
-        
-    def create_enhanced_prompt(self, code: str) -> str:
-        """Create an enhanced security analysis prompt focused on clear explanations"""
-        return f"""You are a security expert who specializes in explaining security issues to non-technical users. Analyze the following code and identify security vulnerabilities.
+
+        # Severity levels for vulnerabilities
+        self.severity_levels = {
+            "critical": 5,
+            "high": 4,
+            "medium": 3,
+            "low": 2,
+            "info": 1
+        }
+
+        # Security best practices by language
+        self.language_specific_checks = {
+            "php": {
+                "framework_security": ["Laravel", "Symfony", "CodeIgniter"],
+                "common_functions": ["eval", "shell_exec", "system"],
+                "security_headers": ["CSP", "HSTS", "X-Frame-Options"]
+            },
+            "python": {
+                "framework_security": ["Django", "Flask", "FastAPI"],
+                "common_functions": ["exec", "eval", "os.system"],
+                "security_headers": ["CORS", "CSP", "X-Content-Type-Options"]
+            },
+            "javascript": {
+                "framework_security": ["Express", "React", "Angular"],
+                "common_functions": ["eval", "Function", "document.write"],
+                "security_headers": ["CSP", "CORS", "X-XSS-Protection"]
+            },
+            "java": {
+                "framework_security": ["Spring", "Hibernate", "Struts"],
+                "common_functions": ["Runtime.exec", "ProcessBuilder", "System.load"],
+                "security_headers": ["CSP", "HSTS", "X-Content-Type-Options"]
+            }
+        }
+    
+    def create_enhanced_prompt(self, code: str, language: str = None) -> str:
+        """Create an enhanced security analysis prompt with language-specific checks"""
+        base_prompt = f"""You are a security expert who specializes in explaining security issues to non-technical users. Analyze the following code and identify security vulnerabilities.
 
 When you find a vulnerability:
 
@@ -137,14 +214,33 @@ When you find a vulnerability:
 - Show the corrected code in a code block
 
 Code to analyze:
-
 {code}
 
+Check for all vulnerability categories including:
+"""
+        # Add all vulnerability categories to prompt
+        for category, checks in self.vulnerability_categories.items():
+            base_prompt += f"\n{category.upper()}:\n"
+            for check in checks:
+                base_prompt += f"- {check}\n"
+
+        # Add language-specific checks if language is provided
+        if language and language in self.language_specific_checks:
+            base_prompt += f"\nSpecific {language.upper()} Security Checks:\n"
+            for check_type, checks in self.language_specific_checks[language].items():
+                base_prompt += f"\n{check_type}:\n"
+                for check in checks:
+                    base_prompt += f"- {check}\n"
+
+        base_prompt += """
 Format each vulnerability like this:
 
 ## 🚨 Vulnerability #[number]: [Simple Name of Issue]
+**Severity:** [Critical/High/Medium/Low]
+**Category:** [Vulnerability Category]
+
 **Line [number]:**
-```php
+```[language]
 [vulnerable code here]
 ```
 
@@ -156,12 +252,22 @@ Format each vulnerability like this:
 
 **How to Fix:**
 [Step-by-step instructions]
-```php
+```[language]
 [corrected code]
 ```
 
 **Why This Fix Works:**
-[Simple explanation of why the fix prevents the issue]"""
+[Simple explanation of why the fix prevents the issue]
+"""
+        return base_prompt
+
+    def get_severity_score(self, severity: str) -> int:
+        """Get numerical score for severity level"""
+        return self.severity_levels.get(severity.lower(), 0)
+
+    def get_language_checks(self, language: str) -> dict:
+        """Get security checks specific to a programming language"""
+        return self.language_specific_checks.get(language.lower(), {})
 
     def analyze_code_openai(self, code: str, user_query: str) -> Dict:
         """Analyze code using OpenAI with enhanced error handling and retry logic"""
