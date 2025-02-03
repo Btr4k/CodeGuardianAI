@@ -312,7 +312,7 @@ Format each vulnerability like this:
                         max_tokens=2000,
                         presence_penalty=0.2,
                         frequency_penalty=0.3,
-                        request_timeout=30
+                        request_timeout=60
                     )
                     return {
                         "status": "success",
