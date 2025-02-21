@@ -475,27 +475,27 @@ def process_uploaded_folder(uploaded_zip):
     return folder_contents, file_metadata
 
 def enhance_streamlit_ui():
-    """Add the enhanced UI elements to Streamlit with cross-platform compatibility"""
+    """Add enhanced UI elements to Streamlit with cross-platform compatibility"""
     st.markdown("""
         <style>
-        /* Base styles */
+        /* Base styles for the entire app */
         .stApp {
-            background-color: #f8f9fa !important;
+            background-color: #f8f9fa !important; /* Light gray for light mode */
         }
         
-        /* Header styles */
+        /* Header section */
         .main-header {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
             padding: 2rem 0 !important;
-            background: linear-gradient(to right, #1a1f2c, #2c3e50) !important;
+            background: linear-gradient(to right, #1a1f2c, #2c3e50) !important; /* Dark gradient */
             border-radius: 10px !important;
             margin-bottom: 2rem !important;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
         
-        /* Logo container */
+        /* Logo and title container */
         .logo-title-container {
             display: flex !important;
             align-items: center !important;
@@ -508,7 +508,7 @@ def enhance_streamlit_ui():
         }
         
         .title-text {
-            color: #ffffff !important;
+            color: #ffffff !important; /* White text for contrast */
             font-size: 2.5rem !important;
             font-weight: bold !important;
             margin: 0 !important;
@@ -517,14 +517,14 @@ def enhance_streamlit_ui():
         
         /* Feature card styles */
         .feature-card {
-            background-color: #ffffff !important;
+            background-color: #ffffff !important; /* White background for light mode */
             padding: 1.5rem !important;
             border-radius: 10px !important;
             margin: 1rem 0 !important;
             border: 1px solid #e9ecef !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
             transition: transform 0.2s !important;
-            color: #1a1f2c !important;
+            color: #1a1f2c !important; /* Dark blue text */
         }
         
         .feature-card:hover {
@@ -532,7 +532,7 @@ def enhance_streamlit_ui():
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
         }
         
-        /* Icon styles */
+        /* Icon and title alignment */
         .icon-title {
             display: flex !important;
             align-items: center !important;
@@ -553,28 +553,28 @@ def enhance_streamlit_ui():
         }
         
         .severity-critical { 
-            background-color: #ff4444 !important; 
+            background-color: #ff4444 !important; /* Red for critical */
             color: #ffffff !important;
         }
         
         .severity-high { 
-            background-color: #ffbb33 !important; 
+            background-color: #ffbb33 !important; /* Orange for high */
             color: #000000 !important;
         }
         
         .severity-medium { 
-            background-color: #ffeb3b !important; 
-            color: #000000 !important;
+            background-color: #ffeb3b !important; /* Yellow for medium */
+            color: #333333 !important; /* Darker gray for better contrast */
         }
         
         .severity-low { 
-            background-color: #00C851 !important; 
+            background-color: #00C851 !important; /* Green for low */
             color: #ffffff !important;
         }
         
         /* Button styles */
         .stButton>button {
-            background: linear-gradient(to right, #4CAF50, #45a049) !important;
+            background: linear-gradient(to right, #4CAF50, #45a049) !important; /* Green gradient */
             color: #ffffff !important;
             border-radius: 5px !important;
             border: none !important;
@@ -593,11 +593,11 @@ def enhance_streamlit_ui():
             background-color: #ffffff !important;
             padding: 2rem !important;
             border-radius: 10px !important;
-            border: 2px dashed #cccccc !important;
+            border: 2px dashed #cccccc !important; /* Gray dashed border */
             text-align: center !important;
         }
         
-        /* Icon text */
+        /* Icon text alignment */
         .icon-text {
             display: flex !important;
             align-items: center !important;
@@ -606,9 +606,9 @@ def enhance_streamlit_ui():
             color: #1a1f2c !important;
         }
         
-        /* Text colors for better visibility */
+        /* General text visibility */
         .stMarkdown, p, li {
-            color: #1a1f2c !important;
+            color: #1a1f2c !important; /* Dark blue for readability */
         }
         
         h1, h2, h3, h4, h5, h6 {
@@ -617,22 +617,35 @@ def enhance_streamlit_ui():
         
         /* Ensure checkmarks are visible */
         .icon-text span:first-child {
-            color: #00C851 !important;
+            color: #00C851 !important; /* Green for icons */
             font-weight: bold !important;
         }
         
-        /* Add support for dark mode */
+        /* Dark mode support */
         @media (prefers-color-scheme: dark) {
             .stApp {
-                background-color: #1a1f2c !important;
+                background-color: #1a1f2c !important; /* Dark blue for dark mode */
             }
             
             .feature-card {
-                background-color: #2c3e50 !important;
-                color: #ffffff !important;
+                background-color: #2c3e50 !important; /* Medium blue for cards */
+                color: #ffffff !important; /* White text */
+            }
+            
+            .upload-section {
+                background-color: #2c3e50 !important; /* Match card color */
+                border-color: #666666 !important; /* Darker gray border */
             }
             
             .stMarkdown, p, li {
+                color: #ffffff !important;
+            }
+            
+            h1, h2, h3, h4, h5, h6 {
+                color: #ffffff !important;
+            }
+            
+            .icon-title, .icon-text {
                 color: #ffffff !important;
             }
         }
