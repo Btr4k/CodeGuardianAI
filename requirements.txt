@@ -1,5 +1,8 @@
+# Core dependencies
 streamlit==1.31.0
 openai==0.28.0
 python-dotenv==1.0.0
 requests==2.31.0
 urllib3==2.1.0
+Pillow==10.2.0        # For image processing and logo handling
+python-magic==0.4.27  # For file type detection
