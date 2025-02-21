@@ -51,7 +51,7 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
 
 
 def generate_text_report(analysis_results: str, base_filename: str = "security_analysis_report") -> str:
-    """Generate a text report with a header and timestamp."""
+    """Generate a text report content without saving to file."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"{base_filename}_{timestamp}.txt"
     report_content = f"""
@@ -62,32 +62,26 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 {analysis_results}
 """
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write(report_content)
-    st.info(f"Report saved to: {os.path.abspath(filename)}")
-    return filename
-
+    return report_content, filename
 
 def generate_download_report(analysis_results):
-    """Generate and provide download link for text report"""
+    """Provide download link for text report without auto-saving"""
     try:
         if not analysis_results:
             st.error("No analysis results available to generate report")
             return
             
-        # Generate the text file
-        report_file = generate_text_report(analysis_results)
+        # Generate the report content
+        report_content, filename = generate_text_report(analysis_results)
         
         # Provide download button
-        with open(report_file, "r", encoding="utf-8") as f:
-            report_data = f.read()
-            st.download_button(
-                label="⬇️ Download Analysis Report",
-                data=report_data,
-                file_name=report_file,
-                mime="text/plain",
-                key="download_report"
-            )
+        st.download_button(
+            label="⬇️ Download Analysis Report",
+            data=report_content,
+            file_name=filename,
+            mime="text/plain",
+            key="download_report"
+        )
             
     except Exception as e:
         st.error(f"Error generating text report: {str(e)}")
@@ -684,7 +678,12 @@ def main():
     st.set_page_config(
         page_title="CodeGuardianAI v2",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="expanded",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': None
+        }
     )
 
     initialize_session_state()
