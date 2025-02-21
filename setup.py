@@ -84,10 +84,8 @@ DEEPSEEK_MODEL=deepseek-chat
 def create_project_structure():
     """Create the project directory structure"""
     directories = [
-        'logs',
-        'cache',
-        'uploads',
-        'reports'
+        'logs',    # For logging errors and debug information
+        'cache'    # For API response caching
     ]
     
     print("\n📁 Creating project structure...")
