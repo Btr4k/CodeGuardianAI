@@ -475,93 +475,166 @@ def process_uploaded_folder(uploaded_zip):
     return folder_contents, file_metadata
 
 def enhance_streamlit_ui():
-    """Add the enhanced UI elements to Streamlit"""
+    """Add the enhanced UI elements to Streamlit with cross-platform compatibility"""
     st.markdown("""
         <style>
+        /* Base styles */
         .stApp {
-            background-color: #f8f9fa;
+            background-color: #f8f9fa !important;
         }
+        
+        /* Header styles */
         .main-header {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem 0;
-            background: linear-gradient(to right, #1a1f2c, #2c3e50);
-            border-radius: 10px;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            padding: 2rem 0 !important;
+            background: linear-gradient(to right, #1a1f2c, #2c3e50) !important;
+            border-radius: 10px !important;
+            margin-bottom: 2rem !important;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
         }
+        
+        /* Logo container */
         .logo-title-container {
-            display: flex;
-            align-items: center;
-            gap: 20px;
+            display: flex !important;
+            align-items: center !important;
+            gap: 20px !important;
         }
+        
         .logo-image {
-            width: 120px;
-            height: auto;
+            width: 120px !important;
+            height: auto !important;
         }
+        
         .title-text {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 0;
+            color: #ffffff !important;
+            font-size: 2.5rem !important;
+            font-weight: bold !important;
+            margin: 0 !important;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
         }
+        
+        /* Feature card styles */
         .feature-card {
-            background-color: white;
-            padding: 1.5rem;
-            border-radius: 10px;
-            margin: 1rem 0;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s;
+            background-color: #ffffff !important;
+            padding: 1.5rem !important;
+            border-radius: 10px !important;
+            margin: 1rem 0 !important;
+            border: 1px solid #e9ecef !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+            transition: transform 0.2s !important;
+            color: #1a1f2c !important;
         }
+        
         .feature-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
         }
+        
+        /* Icon styles */
         .icon-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 1rem;
+            display: flex !important;
+            align-items: center !important;
+            gap: 10px !important;
+            margin-bottom: 1rem !important;
+            color: #1a1f2c !important;
         }
+        
+        /* Severity indicators */
         .severity-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            margin: 4px 0;
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+            margin: 4px 0 !important;
+            font-weight: 500 !important;
         }
-        .severity-critical { background-color: #ff4444; color: white; }
-        .severity-high { background-color: #ffbb33; color: black; }
-        .severity-medium { background-color: #ffeb3b; color: black; }
-        .severity-low { background-color: #00C851; color: white; }
+        
+        .severity-critical { 
+            background-color: #ff4444 !important; 
+            color: #ffffff !important;
+        }
+        
+        .severity-high { 
+            background-color: #ffbb33 !important; 
+            color: #000000 !important;
+        }
+        
+        .severity-medium { 
+            background-color: #ffeb3b !important; 
+            color: #000000 !important;
+        }
+        
+        .severity-low { 
+            background-color: #00C851 !important; 
+            color: #ffffff !important;
+        }
+        
+        /* Button styles */
         .stButton>button {
-            background: linear-gradient(to right, #4CAF50, #45a049);
-            color: white;
-            border-radius: 5px;
-            border: none;
-            padding: 10px 24px;
-            font-weight: 500;
-            transition: all 0.3s;
+            background: linear-gradient(to right, #4CAF50, #45a049) !important;
+            color: #ffffff !important;
+            border-radius: 5px !important;
+            border: none !important;
+            padding: 10px 24px !important;
+            font-weight: 500 !important;
+            transition: all 0.3s !important;
         }
+        
         .stButton>button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
         }
+        
+        /* Upload section */
         .upload-section {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 10px;
-            border: 2px dashed #ccc;
-            text-align: center;
+            background-color: #ffffff !important;
+            padding: 2rem !important;
+            border-radius: 10px !important;
+            border: 2px dashed #cccccc !important;
+            text-align: center !important;
         }
+        
+        /* Icon text */
         .icon-text {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 8px 0;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            margin: 8px 0 !important;
+            color: #1a1f2c !important;
+        }
+        
+        /* Text colors for better visibility */
+        .stMarkdown, p, li {
+            color: #1a1f2c !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: #1a1f2c !important;
+        }
+        
+        /* Ensure checkmarks are visible */
+        .icon-text span:first-child {
+            color: #00C851 !important;
+            font-weight: bold !important;
+        }
+        
+        /* Add support for dark mode */
+        @media (prefers-color-scheme: dark) {
+            .stApp {
+                background-color: #1a1f2c !important;
+            }
+            
+            .feature-card {
+                background-color: #2c3e50 !important;
+                color: #ffffff !important;
+            }
+            
+            .stMarkdown, p, li {
+                color: #ffffff !important;
+            }
         }
         </style>
     """, unsafe_allow_html=True)
