@@ -1,4 +1,4 @@
-# CodeGuardianAI
+# CodeGuardianAI v2
 
 An AI-powered code security analyzer that helps identify and fix security vulnerabilities in your code.
 
