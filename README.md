@@ -111,16 +111,6 @@ pip install openai==0.28.0
    - Custom Query
 5. Review results and implement fixes
 
-## 🔒 Supported Languages
-
-- PHP
-- Python
-- JavaScript
-- Java
-- C++
-- C#
-- Text files
-
 ## ⚙️ Configuration
 
 - Maximum file size: 100KB per file
@@ -128,34 +118,6 @@ pip install openai==0.28.0
 - Supported file extensions: .php, .py, .js, .java, .cpp, .cs, .txt
 - Cache duration: 24 hours
 - Analysis history retention: 30 days
-
-## 📁 Project Structure
-
-```
-CodeGuardianAI/
-├── app.py
-├── setup.py
-├── requirements.txt
-├── .env
-├── logs/
-├── cache/
-├── uploads/
-└── reports/
-```
-
-## 🔍 Security Categories
-
-- Injection Vulnerabilities
-- Authentication Issues
-- Authorization Problems
-- Cryptographic Failures
-- Security Misconfigurations
-- Cross-Site Scripting (XSS)
-- API Security
-- Docker Security
-- Cloud Security
-- Dependency Vulnerabilities
-- Compliance Requirements
 
 ## 🤝 Contributing
 
