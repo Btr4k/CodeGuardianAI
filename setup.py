@@ -40,19 +40,8 @@ def install_dependencies():
         'urllib3'
     ]
     
-    # Additional packages for V2 features
-    v2_packages = [
-        'zipfile36',  # For ZIP file handling
-        'numpy',      # For data processing
-        'pandas',     # For data analysis
-        'logging',    # For enhanced logging
-    ]
-    
     print("\n📦 Installing core packages...")
     subprocess.run([pip_cmd, 'install'] + core_packages)
-    
-    print("\n📦 Installing V2 feature packages...")
-    subprocess.run([pip_cmd, 'install'] + v2_packages)
     
     # Save requirements
     with open('requirements.txt', 'w') as f:
