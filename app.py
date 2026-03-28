@@ -1555,6 +1555,7 @@ def verify_javascript_security(code: str) -> str:
 
 def analyze_php_security(code: str, api_type: str) -> dict:
     """Performs an in-depth, multi-pass security analysis of PHP code."""
+    deterministic = None  # initialise before try so except block can always reference it
     client = APIClient(api_type)
 
     # Properly closed code blocks — no unclosed backtick fences
