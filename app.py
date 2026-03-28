@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from typing import Dict, List, Tuple
 import hashlib
 import logging
+import logging.config
 import time
 from datetime import datetime
 import socket
@@ -19,14 +20,17 @@ from pathlib import Path
 import zipfile
 import io
 
-# Setup logging - minimal output
-logging.basicConfig(
-    level=logging.ERROR,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('security_analyzer.log')
-    ]
-)
+# Setup logging — load from config file if present, otherwise fall back to basicConfig
+_log_config = Path("logging_config.json")
+if _log_config.exists():
+    with open(_log_config) as _f:
+        logging.config.dictConfig(json.load(_f))
+else:
+    logging.basicConfig(
+        level=logging.ERROR,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[logging.FileHandler('security_analyzer.log')]
+    )
 
 # Load environment variables
 load_dotenv()
@@ -37,16 +41,45 @@ REQUIRED_KEYS = {
 }
 
 
-def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.settimeout(timeout)
-    try:
-        s.connect((host, port))
+def check_password() -> bool:
+    """Password gate. Set APP_PASSWORD in .env to enable; skipped when unset."""
+    app_password = os.getenv("APP_PASSWORD")
+    if not app_password:
         return True
-    except (socket.timeout, socket.gaierror, ConnectionRefusedError):
-        return False
-    finally:
-        s.close()
+    if st.session_state.get("authenticated"):
+        return True
+
+    enhance_streamlit_ui()
+    st.markdown("""
+        <div class="login-wrap">
+            <div class="login-card">
+                <div class="login-icon">🛡️</div>
+                <div class="login-title">CodeGuardianAI</div>
+                <div class="login-sub">Enter your access password to continue</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    col = st.columns([1, 2, 1])[1]
+    with col:
+        pwd = st.text_input("Password", type="password", placeholder="Enter password…", label_visibility="collapsed")
+        if st.button("Unlock Access", use_container_width=True):
+            if pwd == app_password:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("Incorrect password. Please try again.")
+    return False
+
+
+def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
+        try:
+            s.connect((host, port))
+            return True
+        except (socket.timeout, socket.gaierror, ConnectionRefusedError):
+            return False
 
 
 def generate_text_report(analysis_results: str, base_filename: str = "security_analysis_report") -> tuple:
@@ -64,27 +97,71 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 
 def generate_download_report(analysis_results):
-    """Provide download link for text report without auto-saving."""
+    """Provide download buttons for text and JSON reports."""
     try:
         if not analysis_results:
             st.error("No analysis results available to generate report")
             return
-        report_content, filename = generate_text_report(analysis_results)
-        st.download_button(
-            label="Download Analysis Report",
-            data=report_content,
-            file_name=filename,
-            mime="text/plain",
-            key="download_report"
-        )
+
+        report_content, txt_filename = generate_text_report(analysis_results)
+
+        # JSON export
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        vulnerabilities = extract_vulnerabilities(analysis_results)
+        json_payload = {
+            "generated_at": datetime.now().isoformat(),
+            "summary": {
+                "total": len(vulnerabilities),
+                "by_severity": {},
+            },
+            "vulnerabilities": [
+                {
+                    "number": v["number"],
+                    "type": v["type"],
+                    "severity": v["severity"],
+                    "location": v["location"],
+                    "code_snippet": v["code_snippet"],
+                    "verification": v.get("verification"),
+                }
+                for v in vulnerabilities
+            ],
+            "raw_analysis": analysis_results,
+        }
+        for v in vulnerabilities:
+            sev = v["severity"]
+            json_payload["summary"]["by_severity"][sev] = json_payload["summary"]["by_severity"].get(sev, 0) + 1
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                label="Download TXT Report",
+                data=report_content,
+                file_name=txt_filename,
+                mime="text/plain",
+                key="download_report_txt"
+            )
+        with col2:
+            st.download_button(
+                label="Download JSON Report",
+                data=json.dumps(json_payload, indent=2),
+                file_name=f"security_analysis_{timestamp}.json",
+                mime="application/json",
+                key="download_report_json"
+            )
     except Exception as e:
-        st.error(f"Error generating text report: {str(e)}")
-        logging.error(f"Text file generation error: {str(e)}", exc_info=True)
+        logging.error(f"Report generation error: {str(e)}", exc_info=True)
+        st.error("Error generating report. Please try again.")
+
+
+_CACHE_DURATION = int(os.getenv("CACHE_DURATION", "86400"))
+_CACHE_DIR = Path("cache")
+_CACHE_FILE = _CACHE_DIR / "analysis_cache.json"
 
 
 class APIOptimizer:
     def __init__(self):
-        self.cache_file = "analysis_cache.json"
+        _CACHE_DIR.mkdir(exist_ok=True)
+        self.cache_file = _CACHE_FILE
         try:
             with open(self.cache_file, 'r') as f:
                 self.cache = json.load(f)
@@ -94,22 +171,24 @@ class APIOptimizer:
     def get_code_hash(self, code: str) -> str:
         return hashlib.sha256(code.encode()).hexdigest()
 
-    def get_cached_analysis(self, code: str, query: str = None) -> dict:
-        """Retrieve cached analysis if available and fresh (within 24 hours)."""
+    def _make_cache_key(self, code: str, query) -> str:
+        """Build a deterministic cache key from code content and query."""
         code_hash = self.get_code_hash(code)
         query_hash = hashlib.sha256(str(query).encode()).hexdigest() if query else "full_scan"
-        cache_key = f"{code_hash}_{query_hash}"
+        return f"{code_hash}_{query_hash}"
+
+    def get_cached_analysis(self, code: str, query: str = None) -> dict:
+        """Retrieve cached analysis if available and fresh."""
+        cache_key = self._make_cache_key(code, query)
         if cache_key in self.cache:
             cached_time = datetime.fromisoformat(self.cache[cache_key]['timestamp'])
-            if (datetime.now() - cached_time).total_seconds() < 86400:
+            if (datetime.now() - cached_time).total_seconds() < _CACHE_DURATION:
                 return self.cache[cache_key]['results']
         return None
 
     def cache_analysis(self, code: str, query: str, results: dict):
         """Store analysis results in cache for later use."""
-        code_hash = self.get_code_hash(code)
-        query_hash = hashlib.sha256(str(query).encode()).hexdigest() if query else "full_scan"
-        cache_key = f"{code_hash}_{query_hash}"
+        cache_key = self._make_cache_key(code, query)
         self.cache[cache_key] = {
             'results': results,
             'timestamp': datetime.now().isoformat()
@@ -117,6 +196,7 @@ class APIOptimizer:
         try:
             with open(self.cache_file, 'w') as f:
                 json.dump(self.cache, f)
+            os.chmod(self.cache_file, 0o600)
         except IOError as e:
             logging.error(f"Cache write error: {str(e)}")
 
@@ -144,7 +224,7 @@ class APIClient:
     def __init__(self, api_type: str):
         self.api_type = api_type.lower()
         if self.api_type == "openai":
-            openai.api_key = os.getenv("OPENAI_API_KEY")
+            self._openai_client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         elif self.api_type == "deepseek":
             self.session = requests.Session()
             self.session.headers.update({
@@ -158,8 +238,8 @@ class APIClient:
         """Create completion with the chosen API provider, always returning an _APIResponse."""
         try:
             if self.api_type == "openai":
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
+                response = self._openai_client.chat.completions.create(
+                    model=os.getenv("OPENAI_MODEL", "gpt-3.5-turbo"),
                     messages=messages,
                     temperature=kwargs.get('temperature', 0.1),
                     max_tokens=kwargs.get('max_tokens', 3000)
@@ -169,7 +249,7 @@ class APIClient:
 
             elif self.api_type == "deepseek":
                 payload = {
-                    "model": "deepseek-chat",
+                    "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
                     "messages": messages,
                     "temperature": kwargs.get('temperature', 0.1),
                     "max_tokens": kwargs.get('max_tokens', 3000),
@@ -485,11 +565,10 @@ Remember: err on the side of reporting issues rather than missing them.
             return result
 
         except Exception as e:
-            error_msg = str(e)
-            logging.error(f"Analysis error: {error_msg}")
+            logging.error(f"Analysis error: {str(e)}")
             return {
                 "status": "error",
-                "message": f"Analysis failed: {error_msg}"
+                "message": "Analysis failed. Please check your API key and try again."
             }
 
     def _analyze_generic(self, code: str, user_query: str, api_type: str, language: str = None) -> Dict:
@@ -527,65 +606,60 @@ Remember: err on the side of reporting issues rather than missing them.
         }
 
 
-def verify_vulnerability(vulnerability_details: dict, code_snippet: str, api_type: str) -> dict:
-    """Performs a secondary verification of a reported vulnerability to reduce false positives."""
+def _batch_verify_vulnerabilities(vulnerabilities: list, api_type: str) -> list:
+    """Verify all vulnerabilities in a single API call. Returns list of verification dicts."""
+    if not vulnerabilities:
+        return []
+
+    vuln_lines = []
+    for i, v in enumerate(vulnerabilities, 1):
+        snippet = v["code_snippet"][:300] if v["code_snippet"] else "(no snippet)"
+        vuln_lines.append(
+            f"[{i}] Type={v['type']} | Severity={v['severity']} | Location={v['location']}\n"
+            f"    Snippet: {snippet}"
+        )
+
+    prompt = (
+        "You are a security verification expert. For each vulnerability listed below, "
+        "determine if it is a TRUE POSITIVE or FALSE POSITIVE.\n\n"
+        "For EACH item respond with exactly this format (one block per item, no extra text):\n\n"
+        "ID: <number>\n"
+        "Verdict: TRUE POSITIVE or FALSE POSITIVE\n"
+        "Confidence: <0-100>\n"
+        "Explanation: <one sentence>\n\n"
+        "VULNERABILITIES TO VERIFY:\n\n"
+        + "\n\n".join(vuln_lines)
+    )
+
     try:
         client = APIClient(api_type)
-        verification_prompt = f"""You are a security expert tasked with verifying if a reported vulnerability is an actual security issue or a false positive.
-
-REPORTED VULNERABILITY:
-Type: {vulnerability_details['type']}
-Severity: {vulnerability_details['severity']}
-Location: {vulnerability_details['location']}
-
-CODE SNIPPET:
-{code_snippet}
-
-TASK:
-Carefully analyze this code and determine if this is truly a vulnerability or a false positive.
-
-Consider:
-1. Is the code actually exploitable, or just theoretically vulnerable?
-2. Are there mitigating factors elsewhere in the code?
-3. Is this a legitimate security concern or a coding style issue?
-4. Would an attacker actually be able to exploit this?
-
-Respond with:
-- Verdict: [TRUE POSITIVE or FALSE POSITIVE]
-- Confidence: [percentage 0-100]
-- Explanation: [detailed justification for your verdict]
-"""
-        messages = [
-            {"role": "system", "content": "You are a security verification expert. Determine if reported vulnerabilities are real issues or false positives."},
-            {"role": "user", "content": verification_prompt}
-        ]
-
-        response = client.create_completion(messages=messages, temperature=0, max_tokens=1000)
+        response = client.create_completion(
+            messages=[
+                {"role": "system", "content": "You are a security verification expert."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0,
+            max_tokens=min(300 * len(vulnerabilities), 3000)
+        )
         content = response.choices[0].message.content
 
-        verdict_match = re.search(r"Verdict:\s*(TRUE POSITIVE|FALSE POSITIVE)", content, re.IGNORECASE)
-        confidence_match = re.search(r"Confidence:\s*(\d+)", content)
-        explanation_match = re.search(r"Explanation:\s*(.*?)(?=$|\n\n)", content, re.DOTALL)
-
-        verdict = verdict_match.group(1) if verdict_match else "UNCERTAIN"
-        confidence = int(confidence_match.group(1)) if confidence_match else 50
-        explanation = explanation_match.group(1).strip() if explanation_match else "No explanation provided."
-
-        return {
-            "verdict": verdict.upper(),
-            "confidence": confidence,
-            "explanation": explanation,
-            "raw_response": content
-        }
+        results = []
+        for i in range(1, len(vulnerabilities) + 1):
+            block_pattern = rf"ID:\s*{i}\s*\nVerdict:\s*(TRUE POSITIVE|FALSE POSITIVE)\s*\nConfidence:\s*(\d+)\s*\nExplanation:\s*([^\n]+)"
+            m = re.search(block_pattern, content, re.IGNORECASE)
+            if m:
+                results.append({
+                    "verdict": m.group(1).upper(),
+                    "confidence": int(m.group(2)),
+                    "explanation": m.group(3).strip(),
+                })
+            else:
+                results.append({"verdict": "UNCERTAIN", "confidence": 50, "explanation": "Could not parse verification response."})
+        return results
 
     except Exception as e:
-        logging.error(f"Verification error: {str(e)}")
-        return {
-            "verdict": "ERROR",
-            "confidence": 0,
-            "explanation": f"Error during verification: {str(e)}",
-            "raw_response": ""
-        }
+        logging.error(f"Batch verification error: {str(e)}")
+        return [{"verdict": "ERROR", "confidence": 0, "explanation": "Verification failed."} for _ in vulnerabilities]
 
 
 def extract_vulnerabilities(analysis_text: str) -> list:
@@ -634,9 +708,9 @@ def verify_all_vulnerabilities(analysis_text: str, api_type: str, confidence_thr
     threshold_values = {"Low": 30, "Medium": 60, "High": 80}
     threshold = threshold_values.get(confidence_threshold, 60)
 
+    verifications = _batch_verify_vulnerabilities(vulnerabilities, api_type)
     verified_vulnerabilities = []
-    for vuln in vulnerabilities:
-        verification = verify_vulnerability(vuln, vuln["code_snippet"], api_type)
+    for vuln, verification in zip(vulnerabilities, verifications):
         vuln["verification"] = verification
         if verification["verdict"] == "TRUE POSITIVE" and verification["confidence"] >= threshold:
             verified_vulnerabilities.append(vuln)
@@ -889,11 +963,10 @@ def analyze_php_security(code: str, api_type: str) -> dict:
         }
 
     except Exception as e:
-        error_msg = str(e)
-        logging.error(f"PHP security analysis error: {error_msg}")
+        logging.error(f"PHP security analysis error: {str(e)}")
         return {
             "status": "error",
-            "message": f"PHP security analysis failed: {error_msg}"
+            "message": "PHP security analysis failed. Please check your API key and try again."
         }
 
 
@@ -912,7 +985,8 @@ def process_single_file(uploaded_file) -> bool:
             st.code(st.session_state.user_code, language=ext)
         return True
     except Exception as e:
-        st.error(f"Error reading file: {str(e)}")
+        logging.error(f"File read error: {str(e)}")
+        st.error("Error reading file. Please ensure the file is valid UTF-8 text.")
         return False
 
 
@@ -949,70 +1023,244 @@ def process_uploaded_folder(uploaded_zip):
 
 
 def enhance_streamlit_ui():
-    """Add enhanced UI styles to Streamlit."""
+    """Inject professional CSS into the Streamlit app."""
     st.markdown("""
-        <style>
-        .stApp { background-color: #f8f9fa !important; }
-        .main-header {
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            padding: 2rem 0 !important;
-            background: linear-gradient(to right, #1a1f2c, #2c3e50) !important;
-            border-radius: 10px !important;
-            margin-bottom: 2rem !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
-        }
-        .logo-title-container { display: flex !important; align-items: center !important; gap: 20px !important; }
-        .logo-image { width: 120px !important; height: auto !important; }
-        .title-text {
-            color: #ffffff !important;
-            font-size: 2.5rem !important;
-            font-weight: bold !important;
-            margin: 0 !important;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3) !important;
-        }
-        .feature-card {
-            background-color: #ffffff !important;
-            padding: 1.5rem !important;
-            border-radius: 10px !important;
-            margin: 1rem 0 !important;
-            border: 1px solid #e9ecef !important;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-            transition: transform 0.2s !important;
-            color: #1a1f2c !important;
-        }
-        .feature-card:hover { transform: translateY(-2px) !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important; }
-        .icon-title { display: flex !important; align-items: center !important; gap: 10px !important; margin-bottom: 1rem !important; color: #1a1f2c !important; }
-        .severity-indicator { display: inline-flex !important; align-items: center !important; gap: 8px !important; padding: 4px 8px !important; border-radius: 4px !important; margin: 4px 0 !important; font-weight: 500 !important; }
-        .severity-critical { background-color: #ff4444 !important; color: #ffffff !important; }
-        .severity-high { background-color: #ffbb33 !important; color: #000000 !important; }
-        .severity-medium { background-color: #ffeb3b !important; color: #333333 !important; }
-        .severity-low { background-color: #00C851 !important; color: #ffffff !important; }
-        .stButton>button {
-            background: linear-gradient(to right, #4CAF50, #45a049) !important;
-            color: #ffffff !important;
-            border-radius: 5px !important;
-            border: none !important;
-            padding: 10px 24px !important;
-            font-weight: 500 !important;
-            transition: all 0.3s !important;
-        }
-        .stButton>button:hover { transform: translateY(-1px) !important; box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important; }
-        .upload-section { background-color: #ffffff !important; padding: 2rem !important; border-radius: 10px !important; border: 2px dashed #cccccc !important; text-align: center !important; }
-        .icon-text { display: flex !important; align-items: center !important; gap: 8px !important; margin: 8px 0 !important; color: #1a1f2c !important; }
-        .stMarkdown, p, li { color: #1a1f2c !important; }
-        h1, h2, h3, h4, h5, h6 { color: #1a1f2c !important; }
-        .icon-text span:first-child { color: #00C851 !important; font-weight: bold !important; }
-        @media (prefers-color-scheme: dark) {
-            .stApp { background-color: #1a1f2c !important; }
-            .feature-card { background-color: #2c3e50 !important; color: #ffffff !important; }
-            .upload-section { background-color: #2c3e50 !important; border-color: #666666 !important; }
-            .stMarkdown, p, li { color: #ffffff !important; }
-            h1, h2, h3, h4, h5, h6 { color: #ffffff !important; }
-            .icon-title, .icon-text { color: #ffffff !important; }
-        }
-        </style>
+    <style>
+    /* ── Google Font ── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* ── Design tokens ── */
+    :root {
+        --bg:          #0d1117;
+        --surface:     #161b22;
+        --surface-2:   #21262d;
+        --border:      #30363d;
+        --border-soft: #21262d;
+        --text:        #e6edf3;
+        --text-muted:  #8b949e;
+        --accent:      #1f6feb;
+        --accent-soft: rgba(31,111,235,0.15);
+        --green:       #238636;
+        --green-soft:  rgba(35,134,54,0.15);
+        --amber:       #d29922;
+        --amber-soft:  rgba(210,153,34,0.15);
+        --red:         #da3633;
+        --red-soft:    rgba(218,54,51,0.15);
+        --orange:      #e3702a;
+        --orange-soft: rgba(227,112,42,0.15);
+        --radius:      10px;
+        --shadow:      0 4px 24px rgba(0,0,0,0.4);
+        --transition:  0.2s ease;
+    }
+
+    /* ── Base ── */
+    html, body, [class*="css"], .stApp {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        background-color: var(--bg) !important;
+        color: var(--text) !important;
+    }
+
+    /* ── Hide Streamlit chrome ── */
+    #MainMenu, footer, header { visibility: hidden; }
+    .block-container { padding-top: 1.5rem !important; max-width: 1200px !important; }
+
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] {
+        background-color: var(--surface) !important;
+        border-right: 1px solid var(--border) !important;
+    }
+    section[data-testid="stSidebar"] * { color: var(--text) !important; }
+    section[data-testid="stSidebar"] .stSelectbox label,
+    section[data-testid="stSidebar"] .stRadio label,
+    section[data-testid="stSidebar"] .stCheckbox label { color: var(--text-muted) !important; font-size: 0.82rem !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; }
+    section[data-testid="stSidebar"] [data-baseweb="select"] > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; }
+    .sidebar-logo { text-align: center; padding: 1.2rem 0 0.5rem; }
+    .sidebar-logo-text { font-size: 1.1rem; font-weight: 700; color: var(--text) !important; letter-spacing: 0.02em; }
+    .sidebar-logo-sub { font-size: 0.72rem; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+    .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 0.8rem 0; }
+    .sidebar-section-label {
+        font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+        color: var(--text-muted) !important; font-weight: 600; padding: 0.6rem 0 0.3rem;
+    }
+
+    /* ── Status pill ── */
+    .status-pill {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+        margin: 2px 0;
+    }
+    .status-online  { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
+    .status-offline { background: var(--red-soft);    color: #f85149 !important; border: 1px solid rgba(248,81,73,0.3); }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+    /* ── Hero header ── */
+    .hero {
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #0d2040 100%);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2.5rem 2rem;
+        text-align: center;
+        margin-bottom: 1.8rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .hero::before {
+        content: '';
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 50% 0%, rgba(31,111,235,0.15) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .hero-badge {
+        display: inline-block;
+        background: var(--accent-soft); color: #58a6ff !important;
+        border: 1px solid rgba(88,166,255,0.3);
+        border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+        padding: 3px 12px; letter-spacing: 0.08em; text-transform: uppercase;
+        margin-bottom: 0.8rem;
+    }
+    .hero-title {
+        font-size: 2.4rem !important; font-weight: 700 !important;
+        color: var(--text) !important; margin: 0.3rem 0 !important;
+        letter-spacing: -0.03em !important; line-height: 1.15 !important;
+    }
+    .hero-title span { color: #58a6ff !important; }
+    .hero-subtitle {
+        font-size: 1rem; color: var(--text-muted) !important;
+        max-width: 560px; margin: 0.5rem auto 0; line-height: 1.6;
+    }
+    .hero-logo { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 0.8rem; object-fit: contain; }
+
+    /* ── Info cards ── */
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+    .info-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1.3rem 1.4rem;
+    }
+    .info-card-title { font-size: 0.82rem; font-weight: 600; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 6px; }
+    .info-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.87rem; color: var(--text) !important; }
+    .info-check { color: #3fb950 !important; font-weight: 700; }
+
+    /* ── Severity badges ── */
+    .sev-badge {
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
+        margin: 3px 2px;
+    }
+    .sev-critical { background: var(--red-soft);    color: #f85149 !important; border: 1px solid rgba(248,81,73,0.3); }
+    .sev-high     { background: var(--orange-soft); color: #ffa657 !important; border: 1px solid rgba(255,166,87,0.3); }
+    .sev-medium   { background: var(--amber-soft);  color: #d29922 !important; border: 1px solid rgba(210,153,34,0.3); }
+    .sev-low      { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
+
+    /* ── Results panel ── */
+    .results-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 1rem 1.4rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius) var(--radius) 0 0;
+        margin-top: 1.2rem;
+    }
+    .results-title { font-size: 0.95rem; font-weight: 700; color: var(--text) !important; display: flex; align-items: center; gap: 8px; }
+    .results-body {
+        background: var(--surface);
+        border: 1px solid var(--border); border-top: none;
+        border-radius: 0 0 var(--radius) var(--radius);
+        padding: 1.4rem;
+    }
+
+    /* ── Alert banners ── */
+    .alert {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 0.85rem 1.1rem; border-radius: 8px;
+        font-size: 0.87rem; margin-bottom: 0.8rem; line-height: 1.5;
+    }
+    .alert-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+    .alert-success { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
+    .alert-warning { background: var(--amber-soft);  color: #d29922 !important; border: 1px solid rgba(210,153,34,0.3); }
+    .alert-info    { background: var(--accent-soft); color: #58a6ff !important; border: 1px solid rgba(88,166,255,0.3); }
+
+    /* ── File table ── */
+    .file-table-header {
+        display: grid; grid-template-columns: 3fr 1fr 1fr;
+        padding: 0.5rem 1rem; font-size: 0.72rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted) !important;
+        border-bottom: 1px solid var(--border);
+    }
+    .file-row {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px; margin: 4px 0; padding: 0.7rem 1rem;
+        transition: border-color var(--transition);
+    }
+    .file-row:hover { border-color: var(--accent); }
+    .file-name { font-weight: 600; font-size: 0.88rem; color: var(--text) !important; }
+    .file-meta { font-size: 0.75rem; color: var(--text-muted) !important; margin-top: 1px; }
+
+    /* ── Scan history ── */
+    .history-item {
+        background: var(--surface-2);
+        border: 1px solid var(--border-soft);
+        border-radius: 8px; padding: 0.8rem 1rem; margin: 6px 0; font-size: 0.84rem;
+    }
+    .history-meta { color: var(--text-muted) !important; font-size: 0.75rem; }
+
+    /* ── Streamlit widget overrides ── */
+    .stTextInput > div > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; border-radius: 8px !important; }
+    .stTextInput > div > div:focus-within { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; }
+    .stButton > button {
+        background: var(--accent) !important; color: #fff !important;
+        border: none !important; border-radius: 8px !important;
+        padding: 0.5rem 1.4rem !important; font-weight: 600 !important; font-size: 0.87rem !important;
+        transition: all var(--transition) !important; letter-spacing: 0.01em !important;
+    }
+    .stButton > button:hover { background: #388bfd !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; transform: translateY(-1px) !important; }
+    .stButton > button:active { transform: translateY(0) !important; }
+    .stDownloadButton > button {
+        background: var(--surface-2) !important; color: var(--text) !important;
+        border: 1px solid var(--border) !important; border-radius: 8px !important;
+        padding: 0.45rem 1.2rem !important; font-weight: 500 !important; font-size: 0.84rem !important;
+        transition: all var(--transition) !important;
+    }
+    .stDownloadButton > button:hover { border-color: var(--accent) !important; color: #58a6ff !important; }
+    .stSelectbox [data-baseweb="select"] > div, .stRadio > div, .stCheckbox > label { color: var(--text) !important; }
+    div[data-testid="stExpander"] { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
+    div[data-testid="stExpander"] summary { color: var(--text) !important; }
+    .stSpinner > div { border-color: var(--accent) transparent transparent transparent !important; }
+    div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stMarkdownContainer"] li { color: var(--text) !important; }
+    div[data-testid="stMarkdownContainer"] h1,
+    div[data-testid="stMarkdownContainer"] h2,
+    div[data-testid="stMarkdownContainer"] h3 { color: var(--text) !important; }
+    div[data-testid="stMarkdownContainer"] code { background: var(--surface-2) !important; color: #79c0ff !important; border-radius: 4px !important; padding: 1px 5px !important; }
+    div[data-testid="stMarkdownContainer"] pre { background: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
+    .stAlert { border-radius: 8px !important; }
+    .stCodeBlock { border-radius: 8px !important; }
+    div[data-testid="stFileUploader"] { background: var(--surface) !important; border: 1px dashed var(--border) !important; border-radius: var(--radius) !important; }
+    div[data-testid="stFileUploader"]:hover { border-color: var(--accent) !important; }
+    div[data-testid="stFileUploader"] * { color: var(--text) !important; }
+    .stSlider [data-testid="stThumbValue"] { background: var(--accent) !important; }
+
+    /* ── Login screen ── */
+    .login-wrap {
+        max-width: 400px; margin: 6rem auto; text-align: center;
+    }
+    .login-card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 16px; padding: 2.5rem 2rem;
+        box-shadow: var(--shadow);
+    }
+    .login-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .login-title { font-size: 1.4rem; font-weight: 700; color: var(--text) !important; margin-bottom: 0.3rem; }
+    .login-sub { font-size: 0.85rem; color: var(--text-muted) !important; margin-bottom: 1.5rem; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    </style>
     """, unsafe_allow_html=True)
 
 
@@ -1043,20 +1291,55 @@ def get_base64_img(image_path: str) -> str:
 
 
 def format_user_friendly_results(analysis_results: str):
-    """Display banner messages based on analysis outcome."""
+    """Display contextual banner then full analysis markdown."""
     if "Original Analysis (Not Verified)" in analysis_results:
-        potential_issues_match = re.search(r"identified (\d+) potential issues", analysis_results)
-        issue_count = potential_issues_match.group(1) if potential_issues_match else "some"
-        st.warning("Potential vulnerabilities detected but not verified")
-        st.markdown(
-            f"The initial analysis found **{issue_count} potential security issues**, "
-            "but they did not pass verification at your current confidence threshold."
-        )
-        st.info("Tip: Lower your confidence threshold to 'Low' in settings to see these potential issues.")
+        m = re.search(r"identified (\d+) potential issues", analysis_results)
+        count = m.group(1) if m else "some"
+        st.markdown(f"""
+            <div class="alert alert-warning">
+                <span class="alert-icon">⚠️</span>
+                <div>
+                    <strong>{count} potential issues found — none passed verification</strong><br>
+                    Lower the confidence threshold in the sidebar to "Low" to review them.
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
     elif "[Secure]" in analysis_results and "Vulnerability #" not in analysis_results:
-        st.success("Your code appears to be secure! No vulnerabilities were detected.")
+        st.markdown("""
+            <div class="alert alert-success">
+                <span class="alert-icon">✅</span>
+                <div><strong>No vulnerabilities detected</strong> — your code appears secure.</div>
+            </div>
+        """, unsafe_allow_html=True)
+    elif "Vulnerability #" in analysis_results:
+        vulns = extract_vulnerabilities(analysis_results)
+        critical = sum(1 for v in vulns if v["severity"] == "Critical")
+        high     = sum(1 for v in vulns if v["severity"] == "High")
+        medium   = sum(1 for v in vulns if v["severity"] == "Medium")
+        low      = sum(1 for v in vulns if v["severity"] == "Low")
+        badge = lambda cls, label: f'<span class="sev-badge sev-{cls.lower()}">{label}</span>'
+        counts = " ".join([
+            badge("critical", f"● {critical} Critical") if critical else "",
+            badge("high",     f"● {high} High")         if high     else "",
+            badge("medium",   f"● {medium} Medium")     if medium   else "",
+            badge("low",      f"● {low} Low")           if low      else "",
+        ])
+        st.markdown(f"""
+            <div class="alert alert-warning">
+                <span class="alert-icon">🔍</span>
+                <div>
+                    <strong>{len(vulns)} verified finding{"s" if len(vulns) != 1 else ""}</strong>
+                    &nbsp;{counts}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
+    st.markdown(
+        '<div class="results-body">',
+        unsafe_allow_html=True,
+    )
     st.markdown(analysis_results)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def run_analysis(code: str, query: str, filename: str, analyzer: SecurityAnalyzer):
@@ -1064,7 +1347,12 @@ def run_analysis(code: str, query: str, filename: str, analyzer: SecurityAnalyze
     result = analyzer.analyze_code(code, query, st.session_state.selected_api.lower(), filename=filename)
 
     if result["status"] != "success":
-        st.error(f"Analysis failed: {result['message']}")
+        st.markdown(f"""
+            <div class="alert alert-warning">
+                <span class="alert-icon">❌</span>
+                <div><strong>Analysis failed</strong><br>{result['message']}</div>
+            </div>
+        """, unsafe_allow_html=True)
         return None
 
     analysis_results = result["analysis"]
@@ -1081,7 +1369,7 @@ def run_analysis(code: str, query: str, filename: str, analyzer: SecurityAnalyze
 
 
 def display_results(analysis_results: str, file_key: str):
-    """Store scan in history and display analysis results."""
+    """Store scan in history and display results with export buttons."""
     if file_key not in st.session_state.scan_history:
         st.session_state.scan_history[file_key] = []
 
@@ -1090,245 +1378,310 @@ def display_results(analysis_results: str, file_key: str):
         'analysis': analysis_results,
         'api': st.session_state.selected_api,
         'confidence_level': st.session_state.confidence_level,
-        'verification_used': st.session_state.verify_vulnerabilities
+        'verification_used': st.session_state.verify_vulnerabilities,
     })
 
-    st.markdown("### Analysis Results")
+    ts = datetime.now().strftime("%H:%M:%S")
+    api_lbl = st.session_state.selected_api
+    conf_lbl = st.session_state.confidence_level
+    st.markdown(f"""
+        <div class="results-header">
+            <div class="results-title">
+                🔐 Security Analysis Report
+            </div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">
+                {ts} &nbsp;·&nbsp; {api_lbl} &nbsp;·&nbsp; Confidence: {conf_lbl}
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
     format_user_friendly_results(analysis_results)
     generate_download_report(analysis_results)
 
     history = st.session_state.scan_history[file_key]
     if len(history) > 1:
-        with st.expander("View Scan History"):
+        with st.expander(f"Scan history ({len(history)} scans)"):
             for idx, scan in enumerate(reversed(history)):
-                st.markdown(f"**Scan {idx + 1}** — {scan['timestamp']}")
-                st.markdown(f"API: {scan['api']} | Confidence: {scan.get('confidence_level', 'N/A')}")
-                if st.button("Show Results", key=f"history_{file_key}_{idx}"):
+                verified = "✓ verified" if scan.get('verification_used') else "unverified"
+                st.markdown(f"""
+                    <div class="history-item">
+                        <strong>Scan {len(history) - idx}</strong>
+                        <span class="history-meta"> · {scan['timestamp'][:19].replace('T',' ')} · {scan['api']} · {scan.get('confidence_level','—')} · {verified}</span>
+                    </div>
+                """, unsafe_allow_html=True)
+                if st.button("View", key=f"hist_{file_key}_{idx}"):
                     st.markdown(scan['analysis'])
 
 
-def main():
-    st.set_page_config(
-        page_title="CodeGuardianAI v2",
-        layout="wide",
-        initial_sidebar_state="expanded",
-        menu_items={'Get Help': None, 'Report a bug': None, 'About': None}
-    )
-
-    initialize_session_state()
-    analyzer = SecurityAnalyzer()
-    enhance_streamlit_ui()
-
-    # Header with logo
-    try:
-        img_base64 = get_base64_img("logo.png")
-        st.markdown(f"""
-            <div class="main-header">
-                <div class="logo-title-container">
-                    <img src="data:image/png;base64,{img_base64}" class="logo-image">
-                    <h1 class="title-text">CodeGuardianAI</h1>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-    except Exception:
-        st.markdown("""
-            <div class="main-header">
-                <div class="logo-title-container">
-                    <h1 class="title-text">CodeGuardianAI</h1>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    # Feature cards
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-            <div class="feature-card">
-                <div class="icon-title"><span style="font-size:24px;">&#128269;</span><h3>What This Tool Does:</h3></div>
-                <div class="icon-text"><span>&#10003;</span><span>Scans Your Code: Checks every line for security problems</span></div>
-                <div class="icon-text"><span>&#10003;</span><span>Simple Explanations: Describes issues in easy-to-understand terms</span></div>
-                <div class="icon-text"><span>&#10003;</span><span>Shows Exact Problems: Highlights exactly where the issues are</span></div>
-                <div class="icon-text"><span>&#10003;</span><span>Provides Solutions: Gives step-by-step instructions to fix each issue</span></div>
-            </div>
-        """, unsafe_allow_html=True)
-    with col2:
-        st.markdown("""
-            <div class="feature-card">
-                <div class="icon-title"><span style="font-size:24px;">&#9888;&#65039;</span><h3>Severity Levels:</h3></div>
-                <div class="severity-indicator severity-critical"><span>&#9679;</span><span>Critical Risk: Needs immediate attention</span></div>
-                <div class="severity-indicator severity-high"><span>&#9679;</span><span>High Risk: Should be fixed soon</span></div>
-                <div class="severity-indicator severity-medium"><span>&#9679;</span><span>Medium Risk: Plan to address</span></div>
-                <div class="severity-indicator severity-low"><span>&#9679;</span><span>Low Risk: Good to fix when possible</span></div>
-            </div>
-        """, unsafe_allow_html=True)
-
-    # Connection check (only once per session)
-    if st.session_state.connection_status is None:
-        with st.spinner("Checking connection..."):
-            has_connection = check_internet_connection()
-            can_reach_api = True
-            try:
-                socket.gethostbyname('api.openai.com')
-            except socket.gaierror:
-                can_reach_api = False
-            st.session_state.connection_status = {'internet': has_connection, 'api': can_reach_api}
-
-    # Sidebar settings
+def _render_sidebar(analyzer: SecurityAnalyzer):
+    """Render the full sidebar: branding, status, settings, upload."""
     with st.sidebar:
-        st.header("Settings")
+        # ── Brand ──────────────────────────────────────────────────────────
+        try:
+            img_b64 = get_base64_img("logo.png")
+            st.markdown(f"""
+                <div class="sidebar-logo">
+                    <img src="data:image/png;base64,{img_b64}" width="54" style="border-radius:12px;margin-bottom:6px;">
+                    <div class="sidebar-logo-text">CodeGuardianAI</div>
+                    <div class="sidebar-logo-sub">Security Analysis Platform</div>
+                </div>""", unsafe_allow_html=True)
+        except Exception:
+            st.markdown("""
+                <div class="sidebar-logo">
+                    <div style="font-size:2rem;">🛡️</div>
+                    <div class="sidebar-logo-text">CodeGuardianAI</div>
+                    <div class="sidebar-logo-sub">Security Analysis Platform</div>
+                </div>""", unsafe_allow_html=True)
 
+        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+
+        # ── Connection status ───────────────────────────────────────────────
+        if st.session_state.connection_status is None:
+            with st.spinner("Checking connection…"):
+                has_internet = check_internet_connection()
+                can_reach_api = True
+                try:
+                    socket.gethostbyname('api.openai.com')
+                except socket.gaierror:
+                    can_reach_api = False
+                st.session_state.connection_status = {
+                    'internet': has_internet, 'api': can_reach_api
+                }
+
+        conn = st.session_state.connection_status
+        net_cls  = "status-online"  if conn['internet'] else "status-offline"
+        api_cls  = "status-online"  if conn['api']      else "status-offline"
+        net_lbl  = "Internet: Connected"    if conn['internet'] else "Internet: Offline"
+        api_lbl  = "API: Reachable"         if conn['api']      else "API: Unreachable"
+        st.markdown(f"""
+            <div style="padding:0 0 0.4rem;">
+                <div class="status-pill {net_cls}"><span class="status-dot"></span>{net_lbl}</div><br>
+                <div class="status-pill {api_cls}"><span class="status-dot"></span>{api_lbl}</div>
+            </div>""", unsafe_allow_html=True)
+
+        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+
+        # ── API provider ────────────────────────────────────────────────────
+        st.markdown('<div class="sidebar-section-label">AI Provider</div>', unsafe_allow_html=True)
         api_choice = st.selectbox(
-            "Choose API Provider",
+            "API Provider",
             ["OpenAI", "Deepseek"],
-            help="Select which AI provider to use for analysis"
+            label_visibility="collapsed",
+            help="Select which AI provider to use for analysis",
         )
         st.session_state.selected_api = api_choice
 
-        st.subheader("False Positive Control")
+        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+
+        # ── Analysis settings ───────────────────────────────────────────────
+        st.markdown('<div class="sidebar-section-label">Analysis Settings</div>', unsafe_allow_html=True)
+
         confidence_level = st.select_slider(
             "Confidence Threshold",
             options=["Low", "Medium", "High"],
             value=st.session_state.confidence_level,
-            help="Higher settings reduce false positives but might miss some issues"
+            help="Higher = fewer false positives, but might miss subtle issues",
         )
         st.session_state.confidence_level = confidence_level
 
         verify_toggle = st.checkbox(
-            "Verify vulnerabilities (reduces false positives)",
+            "Verify findings (batch)",
             value=st.session_state.verify_vulnerabilities,
-            help="Runs a secondary verification pass on each finding. Doubles API calls but greatly improves accuracy."
+            help="Runs a second-pass verification in a single API call to reduce false positives.",
         )
         st.session_state.verify_vulnerabilities = verify_toggle
 
-        with st.expander("About Confidence Levels"):
+        with st.expander("Confidence level guide"):
             st.markdown("""
-            - **Low**: Shows all potential issues, may include false positives
-            - **Medium**: Balanced approach, filters some uncertain findings
-            - **High**: Only shows issues with high confidence, minimizes false positives
+            - **Low** — Shows all potential issues; may include false positives
+            - **Medium** — Balanced; filters low-confidence findings
+            - **High** — Only highly confident findings; minimises noise
             """)
 
+        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+
+        # ── Upload ──────────────────────────────────────────────────────────
+        st.markdown('<div class="sidebar-section-label">Upload Code</div>', unsafe_allow_html=True)
+
         upload_type = st.radio(
-            "Upload Type",
-            ["Single File", "Directory"],
-            help="Choose to upload a single file or entire directory"
+            "Upload type",
+            ["Single File", "Directory (ZIP)"],
+            label_visibility="collapsed",
         )
 
         if upload_type == "Single File":
             uploaded_file = st.file_uploader(
-                "Upload Code File",
+                "Drop a file here",
                 type=["php", "txt", "py", "js", "java", "cpp", "cs"],
-                help="Maximum file size: 100KB"
+                help="Max 100 KB",
+                label_visibility="collapsed",
             )
             if uploaded_file:
                 process_single_file(uploaded_file)
         else:
             uploaded_folder = st.file_uploader(
-                "Upload Directory",
+                "Drop a ZIP here",
                 type="zip",
-                help="Upload a zipped directory of code files"
+                help="Upload a zipped directory of code files",
+                label_visibility="collapsed",
             )
             if uploaded_folder:
                 folder_contents, file_metadata = process_uploaded_folder(uploaded_folder)
                 if folder_contents:
-                    st.markdown("### Files Overview")
-                    for filename, metadata in file_metadata.items():
-                        st.text(f"{filename} ({metadata['size_kb']}KB)")
+                    st.markdown('<div class="sidebar-section-label" style="margin-top:0.6rem;">Loaded Files</div>', unsafe_allow_html=True)
+                    for fname, meta in file_metadata.items():
+                        st.caption(f"📄 {fname} — {meta['size_kb']} KB")
 
-    # Main content area
+
+def _render_analysis_panel(analyzer: SecurityAnalyzer, code: str, filename: str):
+    """Render the scan-type picker, run analysis, and display results."""
+    with st.expander(f"📄 View source — {filename}", expanded=False):
+        ext = filename.rsplit('.', 1)[-1] if '.' in filename else 'text'
+        st.code(code, language=ext)
+
+    analysis_type = st.radio(
+        "Scan mode",
+        ["Full Security Scan", "Custom Query"],
+        horizontal=True,
+    )
+    query = (
+        st.text_input("Describe what to focus on…", placeholder="e.g. Check for SQL injection in the login flow")
+        if analysis_type == "Custom Query"
+        else "Perform a complete security analysis of the code."
+    )
+
+    if not query:
+        return
+
+    with st.spinner(f"Scanning with {st.session_state.selected_api}…"):
+        analysis_results = run_analysis(code, query, filename, analyzer)
+
+    if analysis_results:
+        if (st.session_state.current_file and
+                st.session_state.current_file in st.session_state.file_metadata):
+            st.session_state.file_metadata[st.session_state.current_file]['scanned'] = True
+            st.session_state.file_metadata[st.session_state.current_file]['last_scan'] = (
+                datetime.now().strftime("%Y-%m-%d %H:%M")
+            )
+        display_results(analysis_results, filename)
+
+
+def main():
+    st.set_page_config(
+        page_title="CodeGuardianAI",
+        page_icon="🛡️",
+        layout="wide",
+        initial_sidebar_state="expanded",
+        menu_items={'Get Help': None, 'Report a bug': None, 'About': None},
+    )
+
+    initialize_session_state()
+    if not check_password():
+        st.stop()
+
+    enhance_streamlit_ui()
+    analyzer = SecurityAnalyzer()
+    _render_sidebar(analyzer)
+
+    # ── Hero ────────────────────────────────────────────────────────────────
+    try:
+        img_b64 = get_base64_img("logo.png")
+        logo_html = f'<img src="data:image/png;base64,{img_b64}" class="hero-logo">'
+    except Exception:
+        logo_html = '<div style="font-size:3rem;margin-bottom:0.5rem;">🛡️</div>'
+
+    st.markdown(f"""
+        <div class="hero">
+            {logo_html}
+            <div class="hero-badge">AI-Powered · Multi-Language · v2.1</div>
+            <h1 class="hero-title">Code<span>Guardian</span>AI</h1>
+            <p class="hero-subtitle">
+                Automated security vulnerability analysis powered by OpenAI and Deepseek.
+                Upload your code and get a detailed, actionable security report in seconds.
+            </p>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Info cards ──────────────────────────────────────────────────────────
+    st.markdown("""
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-card-title">🔍 What this tool does</div>
+                <div class="info-row"><span class="info-check">✓</span> Scans every line for security vulnerabilities</div>
+                <div class="info-row"><span class="info-check">✓</span> Pinpoints exact locations with code snippets</div>
+                <div class="info-row"><span class="info-check">✓</span> Provides CWE / OWASP classification</div>
+                <div class="info-row"><span class="info-check">✓</span> Gives minimal, actionable fix suggestions</div>
+                <div class="info-row"><span class="info-check">✓</span> Batch-verifies findings to cut false positives</div>
+            </div>
+            <div class="info-card">
+                <div class="info-card-title">⚠️ Severity levels</div>
+                <div class="info-row"><span class="sev-badge sev-critical">● Critical</span> Direct system compromise — fix now</div>
+                <div class="info-row"><span class="sev-badge sev-high">● High</span> Significant impact — fix soon</div>
+                <div class="info-row"><span class="sev-badge sev-medium">● Medium</span> Moderate impact — plan to address</div>
+                <div class="info-row"><span class="sev-badge sev-low">● Low</span> Limited impact — fix when possible</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Main content ────────────────────────────────────────────────────────
     if st.session_state.folder_contents:
-        st.markdown("### Project Files")
+        st.markdown("""
+            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;
+                        letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.6rem;">
+                Project Files
+            </div>
+        """, unsafe_allow_html=True)
 
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            st.markdown("**Filename**")
-        with col2:
-            st.markdown("**Status**")
-        with col3:
-            st.markdown("**Actions**")
+        st.markdown("""
+            <div class="file-table-header">
+                <span>File</span><span>Status</span><span>Action</span>
+            </div>
+        """, unsafe_allow_html=True)
 
         for filename, content in st.session_state.folder_contents.items():
             metadata = st.session_state.file_metadata[filename]
-            with st.container():
-                cols = st.columns([2, 1, 1])
-                with cols[0]:
-                    st.markdown(f"**{filename}**  \n_{metadata['size_kb']}KB, {metadata['lines']} lines_")
-                with cols[1]:
-                    if metadata['scanned']:
-                        st.success("Scanned")
-                        st.caption(f"Last: {metadata['last_scan']}")
-                    else:
-                        st.warning("Not scanned")
-                with cols[2]:
-                    if st.button("Analyze", key=f"analyze_{filename}"):
-                        st.session_state.current_file = filename
-                        st.session_state.user_code = content
-                        metadata['scanned'] = True
-                        metadata['last_scan'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                        st.rerun()
+            status_html = (
+                '<span class="sev-badge sev-low">✓ Scanned</span>'
+                if metadata['scanned']
+                else '<span class="sev-badge sev-medium">Pending</span>'
+            )
+            st.markdown(f"""
+                <div class="file-row" style="display:grid;grid-template-columns:3fr 1fr 1fr;align-items:center;">
+                    <div>
+                        <div class="file-name">📄 {filename}</div>
+                        <div class="file-meta">{metadata['size_kb']} KB · {metadata['lines']} lines · .{metadata['extension']}</div>
+                    </div>
+                    <div>{status_html}</div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Analyze →", key=f"analyze_{filename}"):
+                st.session_state.current_file = filename
+                st.session_state.user_code = content
+                metadata['scanned'] = True
+                metadata['last_scan'] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                st.rerun()
 
         if st.session_state.current_file and st.session_state.user_code:
             st.markdown("---")
-            st.markdown(f"### Analyzing: {st.session_state.current_file}")
-
-            with st.expander("View File Content"):
-                ext = st.session_state.current_file.rsplit('.', 1)[-1]
-                st.code(st.session_state.user_code, language=ext)
-
-            analysis_type = st.radio(
-                "Choose what to focus on:",
-                ["Full Security Scan", "Custom Query"],
-                horizontal=True
+            st.markdown(f"#### Analyzing: `{st.session_state.current_file}`")
+            _render_analysis_panel(
+                analyzer,
+                st.session_state.user_code,
+                st.session_state.current_file,
             )
 
-            query = None
-            if analysis_type == "Custom Query":
-                query = st.text_input("Type your specific security question here...")
-            else:
-                query = "Perform a complete security analysis of the code."
-
-            if query:
-                with st.spinner(f"Analyzing using {st.session_state.selected_api}..."):
-                    analysis_results = run_analysis(
-                        st.session_state.user_code, query,
-                        st.session_state.current_file, analyzer
-                    )
-                if analysis_results:
-                    display_results(analysis_results, st.session_state.current_file)
-
     elif st.session_state.user_code:
-        st.markdown("### Analysis Options")
-        analysis_type = st.radio(
-            "Choose what to focus on:",
-            ["Full Security Scan", "Custom Query"],
-            horizontal=True
-        )
-
-        query = None
-        if analysis_type == "Custom Query":
-            query = st.text_input("Type your specific security question here...")
-        else:
-            query = "Perform a complete security analysis of the code."
-
-        # Use the actual filename or fall back to a stable key
         file_key = st.session_state.current_file or "uploaded_file"
-
-        if query:
-            with st.spinner(f"Analyzing using {st.session_state.selected_api}..."):
-                analysis_results = run_analysis(
-                    st.session_state.user_code, query, file_key, analyzer
-                )
-            if analysis_results:
-                # Update file metadata if it exists
-                if (st.session_state.current_file and
-                        st.session_state.current_file in st.session_state.file_metadata):
-                    st.session_state.file_metadata[st.session_state.current_file]['scanned'] = True
-                    st.session_state.file_metadata[st.session_state.current_file]['last_scan'] = (
-                        datetime.now().strftime("%Y-%m-%d %H:%M")
-                    )
-                display_results(analysis_results, file_key)
+        _render_analysis_panel(analyzer, st.session_state.user_code, file_key)
 
     else:
-        st.info("Please upload your code using the sidebar to begin analysis")
+        st.markdown("""
+            <div style="text-align:center;padding:4rem 2rem;color:var(--text-muted);">
+                <div style="font-size:3rem;margin-bottom:1rem;">📂</div>
+                <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.4rem;">No code loaded yet</div>
+                <div style="font-size:0.88rem;">Upload a file or ZIP archive using the sidebar to begin analysis.</div>
+            </div>
+        """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":
