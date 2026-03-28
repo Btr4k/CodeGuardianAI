@@ -1179,7 +1179,7 @@ def verify_php_security(code: str) -> str:
             })
 
     # ── 8. Open redirect ──────────────────────────────────────────────────
-    redirect_pattern = r'header\s*\(\s*["\']Location:\s*["\'\s]*\.\s*\$|\header\s*\(\s*"Location:\s*\$|\header\s*\(.*?\$_(?:GET|POST|REQUEST)'
+    redirect_pattern = r'header\s*\(\s*["\']Location:\s*["\'\s]*\.\s*\$|header\s*\(\s*"Location:\s*\$|header\s*\(.*?\$_(?:GET|POST|REQUEST)'
     snippet, loc = _first_line(redirect_pattern)
     if snippet:
         _add({
