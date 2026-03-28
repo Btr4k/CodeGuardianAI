@@ -1,44 +1,38 @@
 version: "3.9"
 
+# ┌─────────────────────────────────────────────────────────────┐
+# │  CodeGuardianAI — Docker Compose                            │
+# │                                                             │
+# │  Setup (one time):                                          │
+# │    1. Copy .env.example → .env and add your API key(s)      │
+# │    2. docker compose up                                     │
+# │    3. Open http://localhost:8501                            │
+# └─────────────────────────────────────────────────────────────┘
+
 services:
-  backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+  app:
+    build: .
+    image: codeguardianai:latest
+    container_name: codeguardianai
     ports:
-      - "8000:8000"
+      - "8501:8501"
+    env_file:
+      - .env
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - APP_PASSWORD=${APP_PASSWORD}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
       - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
       - CACHE_DURATION=${CACHE_DURATION:-86400}
-      - ALLOWED_ORIGINS=http://localhost:3000,http://frontend:3000
     volumes:
-      - backend_cache:/app/cache
-      - backend_logs:/app/logs
+      - cache_data:/app/cache
+      - log_data:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8501/_stcore/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=http://localhost:8000
-        - VITE_WS_URL=ws://localhost:8000
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    restart: unless-stopped
+      start_period: 15s
 
 volumes:
-  backend_cache:
-  backend_logs:
+  cache_data:
+  log_data:
