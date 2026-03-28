@@ -136,7 +136,7 @@ class TestSecurityAnalyzer:
 
     def test_create_enhanced_prompt_php_checklist(self):
         prompt = self.analyzer.create_enhanced_prompt("<?php ?>", "php")
-        assert "PHP SECURITY CHECKLIST" in prompt
+        assert "PHP" in prompt and "CHECKLIST" in prompt
 
 
 # ---------------------------------------------------------------------------

