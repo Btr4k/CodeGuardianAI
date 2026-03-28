@@ -742,9 +742,27 @@ JAVA DEEP ANALYSIS CHECKLIST:
 
         except Exception as e:
             logging.error(f"Analysis error: {str(e)}")
+            # Try to salvage deterministic results even when API fails
+            try:
+                language = self._detect_language(code, filename)
+                det = None
+                if language == 'php':
+                    det = verify_php_security(code)
+                elif language == 'python':
+                    det = verify_python_security(code)
+                elif language == 'javascript':
+                    det = verify_javascript_security(code)
+                if det:
+                    return {
+                        "status": "partial",
+                        "analysis": det + f"\n\n---\n\n> ⚠️ **AI analysis failed** — showing deterministic findings only.\n> Error: `{str(e)}`",
+                        "metadata": {"api": api_type, "timestamp": datetime.now().isoformat(), "query": user_query},
+                    }
+            except Exception:
+                pass
             return {
                 "status": "error",
-                "message": "Analysis failed. Please check your API key and try again."
+                "message": str(e) or "Analysis failed. Please check your API key and try again.",
             }
 
     def _analyze_generic(self, code: str, user_query: str, api_type: str, language: str = None) -> Dict:
@@ -1672,9 +1690,16 @@ def analyze_php_security(code: str, api_type: str) -> dict:
 
     except Exception as e:
         logging.error(f"PHP security analysis error: {str(e)}")
+        # Fallback: return deterministic findings if AI failed
+        if deterministic:
+            return {
+                "status": "partial",
+                "analysis": deterministic + f"\n\n---\n\n> ⚠️ **AI analysis failed** — showing deterministic findings only.\n> Error: `{str(e)}`",
+                "metadata": {"api": api_type, "timestamp": datetime.now().isoformat()},
+            }
         return {
             "status": "error",
-            "message": "PHP security analysis failed. Please check your API key and try again."
+            "message": str(e) or "PHP security analysis failed. Please check your API key and try again.",
         }
 
 
@@ -2065,14 +2090,17 @@ def run_analysis(code: str, query: str, filename: str, analyzer: SecurityAnalyze
     """Run analysis and optionally verify results. Returns the final analysis string or None on error."""
     result = analyzer.analyze_code(code, query, st.session_state.selected_api.lower(), filename=filename)
 
-    if result["status"] != "success":
+    if result["status"] == "error":
         st.markdown(f"""
             <div class="alert alert-warning">
                 <span class="alert-icon">❌</span>
-                <div><strong>Analysis failed</strong><br>{result['message']}</div>
+                <div><strong>Analysis failed</strong><br><code>{result.get('message', 'Unknown error')}</code></div>
             </div>
         """, unsafe_allow_html=True)
         return None
+
+    if result["status"] == "partial":
+        st.warning("⚠️ AI analysis failed — showing deterministic findings only. Check your API key.")
 
     analysis_results = result["analysis"]
 
@@ -2182,13 +2210,29 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
 
         # ── API provider ────────────────────────────────────────────────────
         st.markdown('<div class="sidebar-section-label">AI Provider</div>', unsafe_allow_html=True)
+
+        # Smart default: prefer whichever key is actually configured
+        _oai_key = os.getenv("OPENAI_API_KEY", "")
+        _dsk_key = os.getenv("DEEPSEEK_API_KEY", "")
+        _placeholder = ("your_openai_api_key_here", "your_deepseek_api_key_here", "")
+        _has_openai   = bool(_oai_key and _oai_key not in _placeholder)
+        _has_deepseek = bool(_dsk_key and _dsk_key not in _placeholder)
+        _default_api  = "OpenAI" if _has_openai else ("Deepseek" if _has_deepseek else "OpenAI")
+        _default_idx  = 0 if _default_api == "OpenAI" else 1
+
         api_choice = st.selectbox(
             "API Provider",
             ["OpenAI", "Deepseek"],
+            index=_default_idx,
             label_visibility="collapsed",
             help="Select which AI provider to use for analysis",
         )
         st.session_state.selected_api = api_choice
+
+        # Warn if the chosen provider has no key configured
+        _chosen_key = _oai_key if api_choice == "OpenAI" else _dsk_key
+        if not _chosen_key or _chosen_key in _placeholder:
+            st.warning(f"⚠️ No {api_choice} API key found in `.env`", icon=None)
 
         st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
 
