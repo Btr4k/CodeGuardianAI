@@ -1,0 +1,23 @@
+# Copy this file to YOUR repository to enable automatic security scanning
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    name: CodeGuardianAI Scan
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Security Scan
+        uses: Btr4k/CodeGuardianAI@main
+        with:
+          path: '.'
+          api-provider: 'deepseek'
+          deepseek-api-key: ${{ secrets.DEEPSEEK_API_KEY }}
+          fail-on: 'high'

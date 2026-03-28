@@ -20,6 +20,12 @@ from pathlib import Path
 import zipfile
 import io
 
+try:
+    from fpdf import FPDF
+    _FPDF_AVAILABLE = True
+except ImportError:
+    _FPDF_AVAILABLE = False
+
 # Setup logging — load from config file if present, otherwise fall back to basicConfig
 _log_config = Path("logging_config.json")
 if _log_config.exists():
@@ -96,8 +102,292 @@ Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
     return report_content, filename
 
 
+def _calculate_security_grade(vulnerabilities: list) -> dict:
+    """Return a letter grade A-F based on vulnerability severity counts."""
+    critical = sum(1 for v in vulnerabilities if v["severity"] == "Critical")
+    high     = sum(1 for v in vulnerabilities if v["severity"] == "High")
+    medium   = sum(1 for v in vulnerabilities if v["severity"] == "Medium")
+    low      = sum(1 for v in vulnerabilities if v["severity"] == "Low")
+
+    if critical >= 3:
+        return {
+            "grade": "F",
+            "label": "Critical Risk",
+            "color": "#f85149",
+            "description": "Critical Risk - Immediate action required",
+        }
+    elif critical >= 1 or high >= 3:
+        return {
+            "grade": "D",
+            "label": "Poor",
+            "color": "#ffa657",
+            "description": "Poor - Serious vulnerabilities found",
+        }
+    elif high >= 1:
+        return {
+            "grade": "C",
+            "label": "Fair",
+            "color": "#d29922",
+            "description": "Fair - Significant issues need attention",
+        }
+    elif medium >= 3 or low >= 1:
+        return {
+            "grade": "B",
+            "label": "Good",
+            "color": "#58a6ff",
+            "description": "Good - Minor issues only",
+        }
+    else:
+        return {
+            "grade": "A",
+            "label": "Excellent",
+            "color": "#3fb950",
+            "description": "Excellent - No critical risks",
+        }
+
+
+def generate_pdf_report(analysis_results: str, filename: str = "report") -> bytes:
+    """Generate a professional PDF security report. Returns PDF bytes."""
+    if not _FPDF_AVAILABLE:
+        raise ImportError("fpdf2 is not installed. Run: pip install fpdf2")
+
+    vulnerabilities = extract_vulnerabilities(analysis_results)
+    grade_info = _calculate_security_grade(vulnerabilities)
+
+    critical = sum(1 for v in vulnerabilities if v["severity"] == "Critical")
+    high     = sum(1 for v in vulnerabilities if v["severity"] == "High")
+    medium   = sum(1 for v in vulnerabilities if v["severity"] == "Medium")
+    low      = sum(1 for v in vulnerabilities if v["severity"] == "Low")
+    total    = len(vulnerabilities)
+
+    def _hex_to_rgb(hex_color: str):
+        h = hex_color.lstrip("#")
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+    def _safe_text(text: str) -> str:
+        """Replace non-latin-1 characters so fpdf2 built-in fonts don't crash."""
+        replacements = {
+            "\u2014": "-", "\u2013": "-", "\u2018": "'", "\u2019": "'",
+            "\u201c": '"', "\u201d": '"', "\u2022": "*", "\u2026": "...",
+        }
+        for src, dst in replacements.items():
+            text = text.replace(src, dst)
+        return text.encode("latin-1", errors="replace").decode("latin-1")
+
+    def _truncate(text: str, max_len: int = 200) -> str:
+        result = text[:max_len] + "..." if len(text) > max_len else text
+        return _safe_text(result)
+
+    SEV_COLORS = {
+        "Critical": (248, 81, 73),
+        "High":     (255, 166, 87),
+        "Medium":   (210, 153, 34),
+        "Low":      (63, 185, 80),
+    }
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
+
+    # ── PAGE 1: Cover ─────────────────────────────────────────────────────
+    pdf.add_page()
+
+    # Dark header bar
+    pdf.set_fill_color(13, 17, 23)
+    pdf.rect(0, 0, 210, 60, 'F')
+
+    # Title
+    pdf.set_y(15)
+    pdf.set_font("Helvetica", "B", 28)
+    pdf.set_text_color(230, 237, 243)
+    pdf.cell(0, 12, "CodeGuardianAI", align="C", ln=True)
+
+    pdf.set_font("Helvetica", "", 13)
+    pdf.set_text_color(139, 148, 158)
+    pdf.cell(0, 8, "Security Analysis Report", align="C", ln=True)
+
+    # Reset text color for body
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_y(75)
+
+    # File + date info
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(80, 80, 80)
+    pdf.cell(0, 8, f"File: {filename}", align="C", ln=True)
+    pdf.cell(0, 8, f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", align="C", ln=True)
+
+    # Grade box — centered colored rectangle
+    grade_rgb = _hex_to_rgb(grade_info["color"])
+    box_w, box_h = 60, 60
+    box_x = (210 - box_w) / 2
+    pdf.set_y(pdf.get_y() + 12)
+    pdf.set_fill_color(*grade_rgb)
+    pdf.rect(box_x, pdf.get_y(), box_w, box_h, 'F')
+
+    # Grade letter inside box
+    grade_y = pdf.get_y() + 8
+    pdf.set_font("Helvetica", "B", 36)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(grade_y)
+    pdf.cell(0, 14, grade_info["grade"], align="C", ln=True)
+
+    # Label inside box
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, grade_info["label"], align="C", ln=True)
+
+    # Description below box
+    pdf.set_y(pdf.get_y() + box_h - (pdf.get_y() - grade_y) + 8)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(80, 80, 80)
+    pdf.cell(0, 8, _safe_text(grade_info["description"]), align="C", ln=True)
+
+    # ── PAGE 2: Executive Summary ──────────────────────────────────────────
+    pdf.add_page()
+
+    pdf.set_fill_color(13, 17, 23)
+    pdf.rect(0, 0, 210, 20, 'F')
+    pdf.set_y(5)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(230, 237, 243)
+    pdf.cell(0, 10, "Executive Summary", align="C", ln=True)
+    pdf.set_text_color(30, 30, 30)
+    pdf.set_y(30)
+
+    # Summary table
+    col_w = [70, 50, 50]
+    headers = ["Severity", "Count", "Risk Level"]
+    rows = [
+        ("Critical", str(critical), "Immediate Action"),
+        ("High",     str(high),     "Fix Soon"),
+        ("Medium",   str(medium),   "Plan to Address"),
+        ("Low",      str(low),      "Fix When Possible"),
+        ("TOTAL",    str(total),    ""),
+    ]
+
+    # Table header
+    pdf.set_fill_color(33, 38, 45)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(230, 237, 243)
+    for i, h in enumerate(headers):
+        pdf.cell(col_w[i], 9, h, border=1, fill=True, align="C")
+    pdf.ln()
+
+    # Table rows
+    pdf.set_font("Helvetica", "", 10)
+    for sev, count, risk in rows:
+        if sev in SEV_COLORS:
+            r, g, b = SEV_COLORS[sev]
+            pdf.set_fill_color(r, g, b)
+            pdf.set_text_color(255, 255, 255)
+            fill = True
+        else:
+            pdf.set_fill_color(245, 245, 245)
+            pdf.set_text_color(30, 30, 30)
+            fill = True
+        pdf.cell(col_w[0], 8, sev, border=1, fill=fill, align="C")
+        pdf.cell(col_w[1], 8, count, border=1, fill=fill, align="C")
+        pdf.cell(col_w[2], 8, risk, border=1, fill=fill, align="C")
+        pdf.ln()
+
+    pdf.set_text_color(30, 30, 30)
+    pdf.ln(8)
+
+    # Verdict line
+    pdf.set_font("Helvetica", "B", 11)
+    if critical > 0:
+        verdict = f"{critical} critical vulnerabilit{'y' if critical == 1 else 'ies'} require immediate attention."
+    elif high > 0:
+        verdict = f"{high} high-severity finding{'s' if high > 1 else ''} should be fixed soon."
+    elif total > 0:
+        verdict = f"{total} vulnerability finding{'s' if total > 1 else ''} identified - review and remediate."
+    else:
+        verdict = "No vulnerabilities detected - code appears secure."
+    pdf.multi_cell(0, 8, _safe_text(verdict))
+
+    # Overall risk level
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, f"Overall Risk Level: {_safe_text(grade_info['label'])} (Grade {grade_info['grade']})", ln=True)
+
+    # ── PAGE 3+: Findings ─────────────────────────────────────────────────
+    if vulnerabilities:
+        for vuln in vulnerabilities:
+            pdf.add_page()
+
+            sev = vuln["severity"]
+            sev_rgb = SEV_COLORS.get(sev, (100, 100, 100))
+
+            # Colored severity header bar
+            pdf.set_fill_color(*sev_rgb)
+            pdf.rect(0, 0, 210, 18, 'F')
+            pdf.set_y(4)
+            pdf.set_font("Helvetica", "B", 12)
+            pdf.set_text_color(255, 255, 255)
+            header_text = _safe_text(f"[{sev}] Vulnerability #{vuln['number']}: {_truncate(vuln['type'], 60)}")
+            pdf.cell(0, 10, header_text, align="C", ln=True)
+
+            pdf.set_text_color(30, 30, 30)
+            pdf.set_y(26)
+
+            def _field(label: str, value: str, mono: bool = False):
+                if not value or value.strip() in ("", "Unknown"):
+                    return
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(60, 60, 60)
+                pdf.cell(0, 6, f"{label}: {_safe_text(_truncate(value, 200))}", ln=True)
+                pdf.set_text_color(30, 30, 30)
+
+            def _code_box(label: str, code_text: str):
+                if not code_text or not code_text.strip():
+                    return
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(60, 60, 60)
+                pdf.cell(0, 7, label + ":", ln=True)
+                # Gray background box
+                box_y = pdf.get_y()
+                lines = code_text.strip().splitlines()[:12]
+                box_h = len(lines) * 5.5 + 6
+                pdf.set_fill_color(33, 38, 45)
+                pdf.rect(10, box_y, 190, box_h, 'F')
+                pdf.set_y(box_y + 3)
+                pdf.set_font("Courier", "", 8)
+                pdf.set_text_color(200, 210, 220)
+                for line in lines:
+                    pdf.cell(5, 5.5, "", ln=False)
+                    pdf.cell(0, 5.5, _safe_text(_truncate(line, 110)), ln=True)
+                pdf.set_text_color(30, 30, 30)
+                pdf.set_y(pdf.get_y() + 3)
+
+            # Extract fields from full_content
+            full = vuln.get("full_content", "")
+
+            def _extract_field(pattern: str, text: str) -> str:
+                m = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+                return m.group(1).strip() if m else ""
+
+            location  = vuln.get("location", "")
+            cwe       = _extract_field(r'\*\*CWE:\*\*\s*([^\n]+)', full)
+            owasp     = _extract_field(r'\*\*OWASP[^:]*:\*\*\s*([^\n]+)', full)
+            av        = _extract_field(r'\*\*Attack Vector:\*\*\s*([^\n]+)', full)
+            poc       = _extract_field(r'\*\*POC:\*\*\s*([^\n]+)', full)
+            impact    = _extract_field(r'\*\*Impact:\*\*\s*([^\n]+)', full)
+            fix_match = re.search(r'\*\*Fix:\*\*\s*```[^\n]*\n(.*?)```', full, re.DOTALL)
+            fix_code  = fix_match.group(1).strip() if fix_match else ""
+
+            _field("Location", location)
+            _field("CWE", cwe)
+            _field("OWASP", owasp)
+            _code_box("Code Snippet", vuln.get("code_snippet", ""))
+            _field("Attack Vector", av)
+            _field("POC", poc)
+            _field("Impact", impact)
+            _code_box("Recommended Fix", fix_code)
+
+    # Return PDF bytes
+    return pdf.output()
+
+
 def generate_download_report(analysis_results):
-    """Provide download buttons for text and JSON reports."""
+    """Provide download buttons for text, JSON, and PDF reports."""
     try:
         if not analysis_results:
             st.error("No analysis results available to generate report")
@@ -131,7 +421,7 @@ def generate_download_report(analysis_results):
             sev = v["severity"]
             json_payload["summary"]["by_severity"][sev] = json_payload["summary"]["by_severity"].get(sev, 0) + 1
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.download_button(
                 label="Download TXT Report",
@@ -148,6 +438,22 @@ def generate_download_report(analysis_results):
                 mime="application/json",
                 key="download_report_json"
             )
+        with col3:
+            if _FPDF_AVAILABLE:
+                try:
+                    pdf_bytes = generate_pdf_report(analysis_results, filename=f"security_analysis_{timestamp}")
+                    st.download_button(
+                        label="📄 Download PDF Report",
+                        data=bytes(pdf_bytes),
+                        file_name=f"security_analysis_{timestamp}.pdf",
+                        mime="application/pdf",
+                        key="download_report_pdf"
+                    )
+                except Exception as _pdf_err:
+                    logging.error(f"PDF generation error: {_pdf_err}", exc_info=True)
+                    st.caption("PDF unavailable")
+            else:
+                st.caption("Install fpdf2 for PDF export")
     except Exception as e:
         logging.error(f"Report generation error: {str(e)}", exc_info=True)
         st.error("Error generating report. Please try again.")
@@ -2140,6 +2446,17 @@ def display_results(analysis_results: str, file_key: str):
             <div style="font-size:0.75rem;color:var(--text-muted);">
                 {ts} &nbsp;·&nbsp; {api_lbl} &nbsp;·&nbsp; Confidence: {conf_lbl}
             </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # Show security grade prominently before results
+    _vulns_for_grade = extract_vulnerabilities(analysis_results)
+    _grade = _calculate_security_grade(_vulns_for_grade)
+    st.markdown(f"""
+        <div style="text-align:center;padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:1rem;">
+          <div style="font-size:3.5rem;font-weight:800;color:{_grade['color']};">{_grade['grade']}</div>
+          <div style="font-size:1rem;font-weight:600;color:{_grade['color']};margin-top:0.3rem;">{_grade['label']}</div>
+          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.3rem;">{_grade['description']}</div>
         </div>
     """, unsafe_allow_html=True)
 

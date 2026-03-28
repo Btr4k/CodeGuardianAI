@@ -1,0 +1,132 @@
+name: 'CodeGuardianAI Security Scan'
+description: 'AI-powered security scanner — finds SQL injection, XSS, RCE, SSRF, and 25+ vulnerability types with PoC exploits and ready-to-use fixes.'
+author: 'CodeGuardianAI'
+
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'File or directory to scan'
+    required: false
+    default: '.'
+  api-provider:
+    description: 'AI provider: openai or deepseek'
+    required: false
+    default: 'deepseek'
+  openai-api-key:
+    description: 'OpenAI API key (set as repo secret)'
+    required: false
+    default: ''
+  deepseek-api-key:
+    description: 'Deepseek API key (set as repo secret)'
+    required: false
+    default: ''
+  fail-on:
+    description: 'Fail the workflow if findings at this severity or above are found (critical/high/medium/low/none)'
+    required: false
+    default: 'high'
+  no-ai:
+    description: 'Run deterministic checks only — no API key required'
+    required: false
+    default: 'false'
+  format:
+    description: 'Output format: text, json, markdown'
+    required: false
+    default: 'markdown'
+
+outputs:
+  total-findings:
+    description: 'Total number of vulnerabilities found'
+    value: ${{ steps.scan.outputs.total }}
+  critical-count:
+    description: 'Number of Critical severity findings'
+    value: ${{ steps.scan.outputs.critical }}
+  report-path:
+    description: 'Path to the generated report file'
+    value: ${{ steps.scan.outputs.report-path }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install CodeGuardianAI
+      shell: bash
+      run: |
+        pip install -q openai python-dotenv requests Pillow fpdf2
+
+    - name: Run security scan
+      id: scan
+      shell: bash
+      env:
+        OPENAI_API_KEY:   ${{ inputs.openai-api-key }}
+        DEEPSEEK_API_KEY: ${{ inputs.deepseek-api-key }}
+      run: |
+        SCAN_PATH="${{ inputs.path }}"
+        NO_AI_FLAG=""
+        [ "${{ inputs.no-ai }}" = "true" ] && NO_AI_FLAG="--no-ai"
+
+        REPORT_FILE="codeguardian-report.md"
+
+        if [ -f "$SCAN_PATH" ]; then
+          python ${{ github.action_path }}/scan_cli.py "$SCAN_PATH" \
+            --api "${{ inputs.api-provider }}" \
+            --format markdown \
+            --fail-on "${{ inputs.fail-on }}" \
+            $NO_AI_FLAG > "$REPORT_FILE" 2>/dev/null || EXIT_CODE=$?
+        else
+          # Scan all supported files in directory
+          EXIT_CODE=0
+          echo "# CodeGuardianAI Security Report" > "$REPORT_FILE"
+          echo "" >> "$REPORT_FILE"
+          find "$SCAN_PATH" -type f \( -name "*.php" -o -name "*.py" -o -name "*.js" -o -name "*.java" \) | head -20 | while read f; do
+            echo "## \`$f\`" >> "$REPORT_FILE"
+            python ${{ github.action_path }}/scan_cli.py "$f" \
+              --api "${{ inputs.api-provider }}" \
+              --format markdown \
+              $NO_AI_FLAG >> "$REPORT_FILE" 2>/dev/null || EXIT_CODE=1
+            echo "" >> "$REPORT_FILE"
+          done
+        fi
+
+        # Count findings from JSON output
+        TOTAL=$(python ${{ github.action_path }}/scan_cli.py "$SCAN_PATH" \
+          --api "${{ inputs.api-provider }}" --format json $NO_AI_FLAG 2>/dev/null \
+          | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['summary']['total'])" 2>/dev/null || echo "0")
+        CRITICAL=$(python ${{ github.action_path }}/scan_cli.py "$SCAN_PATH" \
+          --api "${{ inputs.api-provider }}" --format json $NO_AI_FLAG 2>/dev/null \
+          | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['summary']['by_severity'].get('Critical',0))" 2>/dev/null || echo "0")
+
+        echo "total=$TOTAL" >> $GITHUB_OUTPUT
+        echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+        echo "report-path=$REPORT_FILE" >> $GITHUB_OUTPUT
+
+        exit ${EXIT_CODE:-0}
+
+    - name: Upload report artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: codeguardian-security-report
+        path: codeguardian-report.md
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('codeguardian-report.md', 'utf8');
+          const truncated = report.length > 65000 ? report.slice(0, 65000) + '\n\n_Report truncated — download artifact for full results._' : report;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `## 🛡️ CodeGuardianAI Security Scan\n\n${truncated}`
+          });
