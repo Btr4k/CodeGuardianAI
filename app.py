@@ -1787,20 +1787,23 @@ def enhance_streamlit_ui():
     section[data-testid="stSidebar"] .stRadio label,
     section[data-testid="stSidebar"] .stCheckbox label { color: var(--text-muted) !important; font-size: 0.88rem !important; }
     section[data-testid="stSidebar"] [data-baseweb="select"] > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; }
-    .sidebar-logo { text-align: center; padding: 1.2rem 0 0.5rem; }
-    .sidebar-logo-text { font-size: 1.1rem; font-weight: 700; color: var(--text) !important; letter-spacing: 0.01em; }
-    .sidebar-logo-sub { font-size: 0.78rem; color: var(--text-muted) !important; margin-top: 2px; }
-    .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 0.8rem 0; }
+    .sidebar-logo { text-align: center; padding: 0.5rem 0 0.3rem; }
+    .sidebar-logo-text { font-size: 1rem; font-weight: 700; color: var(--text) !important; letter-spacing: 0.01em; }
+    .sidebar-logo-sub { font-size: 0.76rem; color: var(--text-muted) !important; margin-top: 1px; }
+    .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
     .sidebar-section-label {
         font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
-        color: var(--text-muted) !important; font-weight: 600; padding: 0.6rem 0 0.3rem;
+        color: var(--text-muted) !important; font-weight: 600; padding: 0.3rem 0 0.15rem;
     }
+
+    /* ── Sidebar: remove Streamlit's built-in top padding ── */
+    section[data-testid="stSidebar"] > div:first-child { padding-top: 0.5rem !important; }
 
     /* ── Status pill ── */
     .status-pill {
-        display: inline-flex; align-items: center; gap: 6px;
-        padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
-        margin: 2px 0;
+        display: inline-flex; align-items: center; gap: 5px;
+        padding: 2px 8px; border-radius: 20px; font-size: 0.74rem; font-weight: 600;
+        margin: 1px 0;
     }
     .status-online  { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
     .status-offline { background: var(--red-soft);    color: #f85149 !important; border: 1px solid rgba(248,81,73,0.3); }
@@ -2134,7 +2137,7 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
             img_b64 = get_base64_img("logo.png")
             st.markdown(f"""
                 <div class="sidebar-logo">
-                    <img src="data:image/png;base64,{img_b64}" width="54" style="border-radius:12px;margin-bottom:6px;">
+                    <img src="data:image/png;base64,{img_b64}" width="42" style="border-radius:10px;margin-bottom:4px;">
                     <div class="sidebar-logo-text">CodeGuardianAI</div>
                     <div class="sidebar-logo-sub">Security Analysis Platform</div>
                 </div>""", unsafe_allow_html=True)
@@ -2167,8 +2170,8 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
         net_lbl  = "Internet: Connected"    if conn['internet'] else "Internet: Offline"
         api_lbl  = "API: Reachable"         if conn['api']      else "API: Unreachable"
         st.markdown(f"""
-            <div style="padding:0 0 0.4rem;">
-                <div class="status-pill {net_cls}"><span class="status-dot"></span>{net_lbl}</div><br>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding:0.1rem 0;">
+                <div class="status-pill {net_cls}"><span class="status-dot"></span>{net_lbl}</div>
                 <div class="status-pill {api_cls}"><span class="status-dot"></span>{api_lbl}</div>
             </div>""", unsafe_allow_html=True)
 
@@ -2226,7 +2229,7 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
             uploaded_file = st.file_uploader(
                 "Drop a file here",
                 type=["php", "txt", "py", "js", "java", "cpp", "cs"],
-                help="Max 100 KB",
+                help="Max 5 MB",
                 label_visibility="collapsed",
             )
             if uploaded_file:
