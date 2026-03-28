@@ -1684,7 +1684,8 @@ def process_single_file(uploaded_file) -> bool:
         file_content = uploaded_file.getvalue().decode("utf-8")
         _max = int(os.getenv("MAX_FILE_SIZE", str(5 * 1024 * 1024)))  # default 5 MB
         if len(file_content) > _max:
-            st.error(f"File is too large. Please upload a file smaller than {_max // (1024*1024)} MB.")
+            _limit_str = f"{_max // (1024*1024)} MB" if _max >= 1024*1024 else f"{_max // 1024} KB"
+            st.error(f"File is too large. Please upload a file smaller than {_limit_str}.")
             return False
         st.session_state.user_code = file_content
         st.session_state.current_file = uploaded_file.name
@@ -1716,11 +1717,13 @@ def process_uploaded_folder(uploaded_zip):
                         'scanned': False,
                         'last_scan': None
                     }
-                    _max_kb = int(os.getenv("MAX_FILE_SIZE", str(5 * 1024 * 1024))) // 1024
+                    _max_bytes = int(os.getenv("MAX_FILE_SIZE", str(5 * 1024 * 1024)))
+                    _max_kb = _max_bytes / 1024
                     if size_kb <= _max_kb:
                         folder_contents[filename] = content
                     else:
-                        st.warning(f"Skipped {filename}: exceeds {_max_kb // 1024} MB limit")
+                        _lbl = f"{int(_max_bytes//(1024*1024))} MB" if _max_bytes >= 1024*1024 else f"{int(_max_kb)} KB"
+                        st.warning(f"Skipped {filename}: exceeds {_lbl} limit")
 
     if folder_contents:
         st.session_state.folder_contents = folder_contents
