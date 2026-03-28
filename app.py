@@ -1682,8 +1682,9 @@ def process_single_file(uploaded_file) -> bool:
     """Process a single uploaded file."""
     try:
         file_content = uploaded_file.getvalue().decode("utf-8")
-        if len(file_content) > 100 * 1024:
-            st.error("File is too large. Please upload a file smaller than 100KB.")
+        _max = int(os.getenv("MAX_FILE_SIZE", str(5 * 1024 * 1024)))  # default 5 MB
+        if len(file_content) > _max:
+            st.error(f"File is too large. Please upload a file smaller than {_max // (1024*1024)} MB.")
             return False
         st.session_state.user_code = file_content
         st.session_state.current_file = uploaded_file.name
@@ -1715,10 +1716,11 @@ def process_uploaded_folder(uploaded_zip):
                         'scanned': False,
                         'last_scan': None
                     }
-                    if size_kb <= 100:
+                    _max_kb = int(os.getenv("MAX_FILE_SIZE", str(5 * 1024 * 1024))) // 1024
+                    if size_kb <= _max_kb:
                         folder_contents[filename] = content
                     else:
-                        st.warning(f"Skipped {filename}: File size exceeds 100KB limit")
+                        st.warning(f"Skipped {filename}: exceeds {_max_kb // 1024} MB limit")
 
     if folder_contents:
         st.session_state.folder_contents = folder_contents
@@ -1766,6 +1768,9 @@ def enhance_streamlit_ui():
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         background-color: var(--bg) !important;
         color: var(--text) !important;
+        font-size: 15px !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
     }
 
     /* ── Hide Streamlit chrome ── */
@@ -1780,14 +1785,14 @@ def enhance_streamlit_ui():
     section[data-testid="stSidebar"] * { color: var(--text) !important; }
     section[data-testid="stSidebar"] .stSelectbox label,
     section[data-testid="stSidebar"] .stRadio label,
-    section[data-testid="stSidebar"] .stCheckbox label { color: var(--text-muted) !important; font-size: 0.82rem !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; }
+    section[data-testid="stSidebar"] .stCheckbox label { color: var(--text-muted) !important; font-size: 0.88rem !important; }
     section[data-testid="stSidebar"] [data-baseweb="select"] > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; }
     .sidebar-logo { text-align: center; padding: 1.2rem 0 0.5rem; }
-    .sidebar-logo-text { font-size: 1.1rem; font-weight: 700; color: var(--text) !important; letter-spacing: 0.02em; }
-    .sidebar-logo-sub { font-size: 0.72rem; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 2px; }
+    .sidebar-logo-text { font-size: 1.1rem; font-weight: 700; color: var(--text) !important; letter-spacing: 0.01em; }
+    .sidebar-logo-sub { font-size: 0.78rem; color: var(--text-muted) !important; margin-top: 2px; }
     .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 0.8rem 0; }
     .sidebar-section-label {
-        font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+        font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
         color: var(--text-muted) !important; font-weight: 600; padding: 0.6rem 0 0.3rem;
     }
 
@@ -1822,8 +1827,8 @@ def enhance_streamlit_ui():
         display: inline-block;
         background: var(--accent-soft); color: #58a6ff !important;
         border: 1px solid rgba(88,166,255,0.3);
-        border-radius: 20px; font-size: 0.72rem; font-weight: 600;
-        padding: 3px 12px; letter-spacing: 0.08em; text-transform: uppercase;
+        border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+        padding: 3px 12px; letter-spacing: 0.04em; text-transform: uppercase;
         margin-bottom: 0.8rem;
     }
     .hero-title {
@@ -1846,8 +1851,8 @@ def enhance_streamlit_ui():
         border-radius: var(--radius);
         padding: 1.3rem 1.4rem;
     }
-    .info-card-title { font-size: 0.82rem; font-weight: 600; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 6px; }
-    .info-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.87rem; color: var(--text) !important; }
+    .info-card-title { font-size: 0.85rem; font-weight: 600; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 6px; }
+    .info-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.92rem; color: var(--text) !important; }
     .info-check { color: #3fb950 !important; font-weight: 700; }
 
     /* ── Severity badges ── */
@@ -1892,8 +1897,8 @@ def enhance_streamlit_ui():
     /* ── File table ── */
     .file-table-header {
         display: grid; grid-template-columns: 3fr 1fr 1fr;
-        padding: 0.5rem 1rem; font-size: 0.72rem; font-weight: 600;
-        text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted) !important;
+        padding: 0.5rem 1rem; font-size: 0.78rem; font-weight: 600;
+        text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted) !important;
         border-bottom: 1px solid var(--border);
     }
     .file-row {
@@ -1903,16 +1908,16 @@ def enhance_streamlit_ui():
         transition: border-color var(--transition);
     }
     .file-row:hover { border-color: var(--accent); }
-    .file-name { font-weight: 600; font-size: 0.88rem; color: var(--text) !important; }
-    .file-meta { font-size: 0.75rem; color: var(--text-muted) !important; margin-top: 1px; }
+    .file-name { font-weight: 600; font-size: 0.92rem; color: var(--text) !important; }
+    .file-meta { font-size: 0.8rem; color: var(--text-muted) !important; margin-top: 1px; }
 
     /* ── Scan history ── */
     .history-item {
         background: var(--surface-2);
         border: 1px solid var(--border-soft);
-        border-radius: 8px; padding: 0.8rem 1rem; margin: 6px 0; font-size: 0.84rem;
+        border-radius: 8px; padding: 0.8rem 1rem; margin: 6px 0; font-size: 0.88rem;
     }
-    .history-meta { color: var(--text-muted) !important; font-size: 0.75rem; }
+    .history-meta { color: var(--text-muted) !important; font-size: 0.8rem; }
 
     /* ── Streamlit widget overrides ── */
     .stTextInput > div > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; border-radius: 8px !important; }
@@ -1920,7 +1925,7 @@ def enhance_streamlit_ui():
     .stButton > button {
         background: var(--accent) !important; color: #fff !important;
         border: none !important; border-radius: 8px !important;
-        padding: 0.5rem 1.4rem !important; font-weight: 600 !important; font-size: 0.87rem !important;
+        padding: 0.5rem 1.4rem !important; font-weight: 600 !important; font-size: 0.92rem !important;
         transition: all var(--transition) !important; letter-spacing: 0.01em !important;
     }
     .stButton > button:hover { background: #388bfd !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; transform: translateY(-1px) !important; }
