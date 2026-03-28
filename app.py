@@ -944,7 +944,8 @@ def verify_all_vulnerabilities(analysis_text: str, api_type: str, confidence_thr
         updated_content = re.sub(
             r"##\s*\[(Critical|High|Medium|Low)\]\s*Vulnerability\s*#\d+:",
             f"## [{vuln['severity']}] Vulnerability #{i}:",
-            vuln["full_content"]
+            vuln["full_content"],
+            flags=re.IGNORECASE,
         )
         verification_info = (
             f"\n\n**Verification:** Confirmed with {vuln['verification']['confidence']}% confidence\n"
@@ -991,9 +992,9 @@ def _fmt_issue(i: int, issue: dict, lang: str = "php") -> str:
     )
 
 
-def verify_php_security(code: str, analysis_results: str) -> str:
+def verify_php_security(code: str) -> str:
     """Deterministic PHP security checks covering all major vulnerability classes.
-    Always runs regardless of AI result — merges new findings with existing ones."""
+    Always runs regardless of AI result — merges new findings with AI analysis."""
     clean = _strip_code_comments(code, "php")
     lines = code.splitlines()
     issues = []
@@ -1575,6 +1576,10 @@ def analyze_php_security(code: str, api_type: str) -> dict:
     )
 
     try:
+        # ── Step 1: Always run deterministic checks first ─────────────────────
+        deterministic = verify_php_security(code)
+
+        # ── Step 2: AI analysis ───────────────────────────────────────────────
         messages = [
             {"role": "system", "content": "You are an expert PHP security auditor focusing exclusively on finding security vulnerabilities."},
             {"role": "user", "content": security_prompt}
@@ -1591,13 +1596,17 @@ def analyze_php_security(code: str, api_type: str) -> dict:
             ])
         )
 
+        # ── Step 3: Merge deterministic + AI results ──────────────────────────
         if appears_secure:
-            # First: run our own deterministic PHP checks
-            secondary = verify_php_security(code, security_analysis)
-            if secondary:
-                final_analysis = secondary + "\n\n### Initial AI Analysis (Overridden)\n\n" + security_analysis
+            if deterministic:
+                # AI missed real issues — lead with deterministic findings
+                final_analysis = (
+                    deterministic
+                    + "\n\n---\n\n### AI Analysis (Missed Issues Above)\n\n"
+                    + security_analysis
+                )
             else:
-                # Second: get an adversarial second opinion from the AI
+                # Neither deterministic nor AI found anything — get adversarial second opinion
                 challenge_prompt = (
                     "You are a professional penetration tester who specializes in finding vulnerabilities that other auditors miss.\n"
                     "The following PHP code was marked 'secure' by another auditor. Find what they overlooked.\n\n"
@@ -1617,12 +1626,10 @@ def analyze_php_security(code: str, api_type: str) -> dict:
                     "If you find vulnerabilities, use '## VULNERABILITY DETECTED' headers.\n"
                     "If you agree the code is secure, respond with: ## [Secure] Code Verified Secure"
                 )
-
                 messages = [
                     {"role": "system", "content": "You are an adversarial security researcher who specializes in finding vulnerabilities other auditors miss."},
                     {"role": "user", "content": challenge_prompt}
                 ]
-
                 logging.info("Getting second opinion for PHP security analysis...")
                 response2 = client.create_completion(messages=messages, temperature=0.2, max_tokens=3000)
                 second_opinion = response2.choices[0].message.content
@@ -1642,7 +1649,16 @@ def analyze_php_security(code: str, api_type: str) -> dict:
                         f"{security_analysis}"
                     )
         else:
-            final_analysis = security_analysis
+            # AI found vulnerabilities
+            if deterministic:
+                # Prepend deterministic findings so they are never buried
+                final_analysis = (
+                    deterministic
+                    + "\n\n---\n\n### AI Analysis\n\n"
+                    + security_analysis
+                )
+            else:
+                final_analysis = security_analysis
 
         return {
             "status": "success",
@@ -1650,7 +1666,7 @@ def analyze_php_security(code: str, api_type: str) -> dict:
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "api": api_type,
-                "multiple_analyses": appears_secure
+                "multiple_analyses": appears_secure,
             }
         }
 
