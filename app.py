@@ -2096,34 +2096,38 @@ def enhance_streamlit_ui():
     """Inject professional CSS into the Streamlit app."""
     st.markdown("""
     <style>
-    /* ── Google Font ── */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800&display=swap');
 
-    /* ── Design tokens ── */
     :root {
-        --bg:          #0d1117;
-        --surface:     #161b22;
-        --surface-2:   #21262d;
-        --border:      #30363d;
-        --border-soft: #21262d;
-        --text:        #e6edf3;
-        --text-muted:  #8b949e;
-        --accent:      #1f6feb;
-        --accent-soft: rgba(31,111,235,0.15);
-        --green:       #238636;
-        --green-soft:  rgba(35,134,54,0.15);
-        --amber:       #d29922;
-        --amber-soft:  rgba(210,153,34,0.15);
-        --red:         #da3633;
-        --red-soft:    rgba(218,54,51,0.15);
-        --orange:      #e3702a;
-        --orange-soft: rgba(227,112,42,0.15);
-        --radius:      10px;
-        --shadow:      0 4px 24px rgba(0,0,0,0.4);
-        --transition:  0.2s ease;
+        --bg:             #060b14;
+        --surface:        #0d1526;
+        --surface-2:      #111d35;
+        --surface-3:      #1a2744;
+        --border:         #1e2d4a;
+        --border-bright:  #2a3f5f;
+        --text:           #e8edf5;
+        --text-secondary: #8fa3c4;
+        --text-muted:     #4a6080;
+        --accent:         #3b82f6;
+        --accent-glow:    rgba(59,130,246,0.2);
+        --accent-soft:    rgba(59,130,246,0.1);
+        --green:          #10b981;
+        --green-soft:     rgba(16,185,129,0.12);
+        --amber:          #f59e0b;
+        --amber-soft:     rgba(245,158,11,0.12);
+        --red:            #ef4444;
+        --red-soft:       rgba(239,68,68,0.12);
+        --orange:         #f97316;
+        --orange-soft:    rgba(249,115,22,0.12);
+        --purple:         #8b5cf6;
+        --purple-soft:    rgba(139,92,246,0.12);
+        --radius:         12px;
+        --radius-sm:      8px;
+        --shadow:         0 4px 32px rgba(0,0,0,0.5);
+        --shadow-glow:    0 0 40px rgba(59,130,246,0.15);
+        --transition:     0.18s ease;
     }
 
-    /* ── Base ── */
     html, body, [class*="css"], .stApp {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         background-color: var(--bg) !important;
@@ -2133,208 +2137,344 @@ def enhance_streamlit_ui():
         -moz-osx-font-smoothing: grayscale !important;
     }
 
-    /* ── Hide Streamlit chrome ── */
     #MainMenu, footer, header { visibility: hidden; }
-    .block-container { padding-top: 1.5rem !important; max-width: 1200px !important; }
+    .block-container { padding-top: 1.2rem !important; max-width: 1260px !important; padding-left: 2rem !important; padding-right: 2rem !important; }
 
-    /* ── Sidebar ── */
+    /* ── SIDEBAR ─────────────────────────────────────────────────────── */
     section[data-testid="stSidebar"] {
-        background-color: var(--surface) !important;
+        background: linear-gradient(180deg, #0a1220 0%, #060b14 100%) !important;
         border-right: 1px solid var(--border) !important;
     }
+    section[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
     section[data-testid="stSidebar"] * { color: var(--text) !important; }
     section[data-testid="stSidebar"] .stSelectbox label,
     section[data-testid="stSidebar"] .stRadio label,
-    section[data-testid="stSidebar"] .stCheckbox label { color: var(--text-muted) !important; font-size: 0.88rem !important; }
-    section[data-testid="stSidebar"] [data-baseweb="select"] > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; }
-    .sidebar-logo { text-align: center; padding: 0.5rem 0 0.3rem; }
-    .sidebar-logo-text { font-size: 1rem; font-weight: 700; color: var(--text) !important; letter-spacing: 0.01em; }
-    .sidebar-logo-sub { font-size: 0.76rem; color: var(--text-muted) !important; margin-top: 1px; }
-    .sidebar-divider { border: none; border-top: 1px solid var(--border); margin: 0.4rem 0; }
-    .sidebar-section-label {
-        font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em;
-        color: var(--text-muted) !important; font-weight: 600; padding: 0.3rem 0 0.15rem;
+    section[data-testid="stSidebar"] .stCheckbox label {
+        color: var(--text-secondary) !important;
+        font-size: 0.82rem !important;
+        font-weight: 500 !important;
+    }
+    section[data-testid="stSidebar"] [data-baseweb="select"] > div {
+        background: var(--surface-2) !important;
+        border: 1px solid var(--border-bright) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text) !important;
     }
 
-    /* ── Sidebar: remove Streamlit's built-in top padding ── */
-    section[data-testid="stSidebar"] > div:first-child { padding-top: 0.5rem !important; }
+    /* Sidebar brand */
+    .sb-brand {
+        padding: 1.2rem 1rem 0.8rem;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 0.2rem;
+        display: flex; align-items: center; gap: 10px;
+    }
+    .sb-brand-icon {
+        width: 36px; height: 36px; border-radius: 10px;
+        background: linear-gradient(135deg, #1d4ed8, #7c3aed);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.1rem; flex-shrink: 0;
+        box-shadow: 0 0 16px rgba(59,130,246,0.4);
+    }
+    .sb-brand-text { font-size: 0.95rem; font-weight: 700; line-height: 1.2; }
+    .sb-brand-sub  { font-size: 0.7rem; color: var(--text-muted) !important; }
 
-    /* ── Status pill ── */
-    .status-pill {
+    /* Sidebar status */
+    .sb-status-row { display: flex; gap: 6px; flex-wrap: wrap; padding: 0.6rem 0.2rem; }
+    .sb-pill {
         display: inline-flex; align-items: center; gap: 5px;
-        padding: 2px 8px; border-radius: 20px; font-size: 0.74rem; font-weight: 600;
-        margin: 1px 0;
+        padding: 3px 9px; border-radius: 20px;
+        font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em;
     }
-    .status-online  { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
-    .status-offline { background: var(--red-soft);    color: #f85149 !important; border: 1px solid rgba(248,81,73,0.3); }
-    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .sb-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .pill-green  { background: var(--green-soft);  color: var(--green) !important;  border: 1px solid rgba(16,185,129,0.25); }
+    .pill-red    { background: var(--red-soft);    color: var(--red) !important;    border: 1px solid rgba(239,68,68,0.25); }
+    .pill-blue   { background: var(--accent-soft); color: var(--accent) !important; border: 1px solid rgba(59,130,246,0.25); }
 
-    /* ── Hero header ── */
+    /* Sidebar section */
+    .sb-section {
+        padding: 0.5rem 0.2rem 0.1rem;
+        font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.1em; color: var(--text-muted) !important;
+    }
+    .sb-divider { border: none; border-top: 1px solid var(--border); margin: 0.3rem 0; }
+
+    /* ── HERO ─────────────────────────────────────────────────────────── */
     .hero {
-        background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #0d2040 100%);
-        border: 1px solid var(--border);
-        border-radius: var(--radius);
-        padding: 2.5rem 2rem;
+        background: linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0f1729 100%);
+        border: 1px solid var(--border-bright);
+        border-radius: 16px;
+        padding: 2.8rem 2rem 2.2rem;
         text-align: center;
-        margin-bottom: 1.8rem;
+        margin-bottom: 1.6rem;
         position: relative;
         overflow: hidden;
+        box-shadow: var(--shadow-glow);
     }
     .hero::before {
         content: '';
         position: absolute; inset: 0;
-        background: radial-gradient(ellipse at 50% 0%, rgba(31,111,235,0.15) 0%, transparent 70%);
+        background: radial-gradient(ellipse at 50% -20%, rgba(59,130,246,0.18) 0%, transparent 65%);
         pointer-events: none;
     }
-    .hero-badge {
-        display: inline-block;
-        background: var(--accent-soft); color: #58a6ff !important;
-        border: 1px solid rgba(88,166,255,0.3);
-        border-radius: 20px; font-size: 0.78rem; font-weight: 600;
-        padding: 3px 12px; letter-spacing: 0.04em; text-transform: uppercase;
-        margin-bottom: 0.8rem;
+    .hero::after {
+        content: '';
+        position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(59,130,246,0.4), transparent);
     }
+    .hero-eyebrow {
+        display: inline-flex; align-items: center; gap: 6px;
+        background: var(--accent-soft); color: #93c5fd !important;
+        border: 1px solid rgba(59,130,246,0.25);
+        border-radius: 20px; font-size: 0.74rem; font-weight: 600;
+        padding: 4px 14px; letter-spacing: 0.05em;
+        margin-bottom: 1rem;
+    }
+    .hero-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
     .hero-title {
-        font-size: 2.4rem !important; font-weight: 700 !important;
-        color: var(--text) !important; margin: 0.3rem 0 !important;
-        letter-spacing: -0.03em !important; line-height: 1.15 !important;
+        font-size: 2.8rem !important; font-weight: 800 !important;
+        background: linear-gradient(135deg, #e8edf5 30%, #93c5fd 100%) !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+        background-clip: text !important;
+        margin: 0 0 0.6rem !important;
+        letter-spacing: -0.04em !important; line-height: 1.1 !important;
     }
-    .hero-title span { color: #58a6ff !important; }
     .hero-subtitle {
-        font-size: 1rem; color: var(--text-muted) !important;
-        max-width: 560px; margin: 0.5rem auto 0; line-height: 1.6;
+        font-size: 1rem; color: var(--text-secondary) !important;
+        max-width: 520px; margin: 0 auto; line-height: 1.65; font-weight: 400;
     }
-    .hero-logo { width: 72px; height: 72px; border-radius: 16px; margin-bottom: 0.8rem; object-fit: contain; }
+    .hero-logo {
+        width: 64px; height: 64px; border-radius: 14px; margin-bottom: 1rem;
+        object-fit: contain;
+        box-shadow: 0 0 24px rgba(59,130,246,0.3);
+    }
 
-    /* ── Info cards ── */
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
-    .info-card {
+    /* Hero stat pills */
+    .hero-stats { display: flex; justify-content: center; gap: 1rem; margin-top: 1.4rem; flex-wrap: wrap; }
+    .hero-stat {
+        background: rgba(255,255,255,0.04);
+        border: 1px solid var(--border-bright);
+        border-radius: 8px; padding: 0.45rem 1rem;
+        font-size: 0.8rem; color: var(--text-secondary) !important;
+        display: flex; align-items: center; gap: 6px;
+    }
+    .hero-stat strong { color: var(--text) !important; font-weight: 600; }
+
+    /* ── FEATURE CARDS ────────────────────────────────────────────────── */
+    .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; margin-bottom: 1.6rem; }
+    .feat-card {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        padding: 1.3rem 1.4rem;
+        padding: 1.1rem 1.2rem;
+        transition: border-color var(--transition), background var(--transition);
     }
-    .info-card-title { font-size: 0.85rem; font-weight: 600; color: var(--text-muted) !important; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.8rem; display: flex; align-items: center; gap: 6px; }
-    .info-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.92rem; color: var(--text) !important; }
-    .info-check { color: #3fb950 !important; font-weight: 700; }
+    .feat-card:hover { border-color: var(--border-bright); background: var(--surface-2); }
+    .feat-icon { font-size: 1.4rem; margin-bottom: 0.5rem; }
+    .feat-title { font-size: 0.85rem; font-weight: 700; color: var(--text) !important; margin-bottom: 0.3rem; }
+    .feat-desc  { font-size: 0.8rem; color: var(--text-secondary) !important; line-height: 1.5; }
 
-    /* ── Severity badges ── */
+    /* ── SEVERITY LEGEND ──────────────────────────────────────────────── */
+    .sev-legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.7rem; margin-bottom: 1.6rem; }
+    .sev-card {
+        border-radius: var(--radius-sm);
+        padding: 0.8rem 1rem;
+        border-left: 3px solid;
+    }
+    .sev-card-critical { background: var(--red-soft);    border-color: var(--red);    }
+    .sev-card-high     { background: var(--orange-soft); border-color: var(--orange); }
+    .sev-card-medium   { background: var(--amber-soft);  border-color: var(--amber);  }
+    .sev-card-low      { background: var(--green-soft);  border-color: var(--green);  }
+    .sev-card-label { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .sev-card-critical .sev-card-label { color: var(--red) !important; }
+    .sev-card-high     .sev-card-label { color: var(--orange) !important; }
+    .sev-card-medium   .sev-card-label { color: var(--amber) !important; }
+    .sev-card-low      .sev-card-label { color: var(--green) !important; }
+    .sev-card-desc { font-size: 0.75rem; color: var(--text-secondary) !important; margin-top: 2px; line-height: 1.4; }
+
+    /* ── SEVERITY BADGES (inline) ─────────────────────────────────────── */
     .sev-badge {
-        display: inline-flex; align-items: center; gap: 5px;
-        padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
-        margin: 3px 2px;
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 10px; border-radius: 6px; font-size: 0.75rem; font-weight: 700;
+        margin: 2px 2px; letter-spacing: 0.02em;
     }
-    .sev-critical { background: var(--red-soft);    color: #f85149 !important; border: 1px solid rgba(248,81,73,0.3); }
-    .sev-high     { background: var(--orange-soft); color: #ffa657 !important; border: 1px solid rgba(255,166,87,0.3); }
-    .sev-medium   { background: var(--amber-soft);  color: #d29922 !important; border: 1px solid rgba(210,153,34,0.3); }
-    .sev-low      { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
+    .sev-critical { background: var(--red-soft);    color: #fca5a5 !important; border: 1px solid rgba(239,68,68,0.3); }
+    .sev-high     { background: var(--orange-soft); color: #fdba74 !important; border: 1px solid rgba(249,115,22,0.3); }
+    .sev-medium   { background: var(--amber-soft);  color: #fcd34d !important; border: 1px solid rgba(245,158,11,0.3); }
+    .sev-low      { background: var(--green-soft);  color: #6ee7b7 !important; border: 1px solid rgba(16,185,129,0.3); }
 
-    /* ── Results panel ── */
+    /* ── GRADE BOX ────────────────────────────────────────────────────── */
+    .grade-box {
+        background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+        border: 1px solid var(--border-bright);
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        margin-bottom: 1.2rem;
+        position: relative;
+        overflow: hidden;
+    }
+    .grade-box::before {
+        content: ''; position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 50% 0%, var(--grade-glow, rgba(59,130,246,0.12)) 0%, transparent 70%);
+        pointer-events: none;
+    }
+    .grade-letter { font-size: 4.5rem; font-weight: 900; line-height: 1; }
+    .grade-label  { font-size: 1rem; font-weight: 600; margin-top: 0.4rem; }
+    .grade-desc   { font-size: 0.82rem; color: var(--text-secondary) !important; margin-top: 0.3rem; }
+    .grade-divider { width: 40px; height: 2px; margin: 0.8rem auto; border-radius: 1px; opacity: 0.4; }
+
+    /* ── RESULTS HEADER ───────────────────────────────────────────────── */
     .results-header {
         display: flex; align-items: center; justify-content: space-between;
-        padding: 1rem 1.4rem;
-        background: var(--surface);
-        border: 1px solid var(--border);
+        padding: 0.9rem 1.4rem;
+        background: var(--surface-2);
+        border: 1px solid var(--border-bright);
         border-radius: var(--radius) var(--radius) 0 0;
-        margin-top: 1.2rem;
+        margin-top: 1rem;
     }
-    .results-title { font-size: 0.95rem; font-weight: 700; color: var(--text) !important; display: flex; align-items: center; gap: 8px; }
+    .results-title {
+        font-size: 0.92rem; font-weight: 700; color: var(--text) !important;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .results-meta { font-size: 0.74rem; color: var(--text-muted) !important; }
     .results-body {
         background: var(--surface);
-        border: 1px solid var(--border); border-top: none;
+        border: 1px solid var(--border-bright); border-top: none;
         border-radius: 0 0 var(--radius) var(--radius);
         padding: 1.4rem;
     }
 
-    /* ── Alert banners ── */
+    /* ── ALERT BANNERS ────────────────────────────────────────────────── */
     .alert {
         display: flex; align-items: flex-start; gap: 10px;
-        padding: 0.85rem 1.1rem; border-radius: 8px;
-        font-size: 0.87rem; margin-bottom: 0.8rem; line-height: 1.5;
+        padding: 0.9rem 1.1rem; border-radius: var(--radius-sm);
+        font-size: 0.87rem; margin-bottom: 1rem; line-height: 1.55;
+        border-left: 3px solid;
     }
     .alert-icon { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
-    .alert-success { background: var(--green-soft);  color: #3fb950 !important; border: 1px solid rgba(63,185,80,0.3); }
-    .alert-warning { background: var(--amber-soft);  color: #d29922 !important; border: 1px solid rgba(210,153,34,0.3); }
-    .alert-info    { background: var(--accent-soft); color: #58a6ff !important; border: 1px solid rgba(88,166,255,0.3); }
+    .alert-success { background: var(--green-soft);  color: #6ee7b7 !important; border-color: var(--green); }
+    .alert-warning { background: var(--amber-soft);  color: #fcd34d !important; border-color: var(--amber); }
+    .alert-error   { background: var(--red-soft);    color: #fca5a5 !important; border-color: var(--red); }
+    .alert-info    { background: var(--accent-soft); color: #93c5fd !important; border-color: var(--accent); }
 
-    /* ── File table ── */
-    .file-table-header {
-        display: grid; grid-template-columns: 3fr 1fr 1fr;
-        padding: 0.5rem 1rem; font-size: 0.78rem; font-weight: 600;
-        text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted) !important;
-        border-bottom: 1px solid var(--border);
-    }
-    .file-row {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 8px; margin: 4px 0; padding: 0.7rem 1rem;
-        transition: border-color var(--transition);
-    }
-    .file-row:hover { border-color: var(--accent); }
-    .file-name { font-weight: 600; font-size: 0.92rem; color: var(--text) !important; }
-    .file-meta { font-size: 0.8rem; color: var(--text-muted) !important; margin-top: 1px; }
-
-    /* ── Scan history ── */
-    .history-item {
-        background: var(--surface-2);
-        border: 1px solid var(--border-soft);
-        border-radius: 8px; padding: 0.8rem 1rem; margin: 6px 0; font-size: 0.88rem;
-    }
-    .history-meta { color: var(--text-muted) !important; font-size: 0.8rem; }
-
-    /* ── Streamlit widget overrides ── */
-    .stTextInput > div > div { background: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text) !important; border-radius: 8px !important; }
-    .stTextInput > div > div:focus-within { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; }
+    /* ── SCAN BUTTON EMPHASIS ─────────────────────────────────────────── */
     .stButton > button {
-        background: var(--accent) !important; color: #fff !important;
-        border: none !important; border-radius: 8px !important;
-        padding: 0.5rem 1.4rem !important; font-weight: 600 !important; font-size: 0.92rem !important;
-        transition: all var(--transition) !important; letter-spacing: 0.01em !important;
+        background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
+        color: #fff !important; border: none !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 0.6rem 1.8rem !important;
+        font-weight: 700 !important; font-size: 0.93rem !important;
+        transition: all var(--transition) !important;
+        letter-spacing: 0.01em !important;
+        box-shadow: 0 2px 12px rgba(37,99,235,0.35) !important;
     }
-    .stButton > button:hover { background: #388bfd !important; box-shadow: 0 0 0 3px var(--accent-soft) !important; transform: translateY(-1px) !important; }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+        box-shadow: 0 4px 20px rgba(59,130,246,0.5) !important;
+        transform: translateY(-1px) !important;
+    }
     .stButton > button:active { transform: translateY(0) !important; }
+
     .stDownloadButton > button {
         background: var(--surface-2) !important; color: var(--text) !important;
-        border: 1px solid var(--border) !important; border-radius: 8px !important;
-        padding: 0.45rem 1.2rem !important; font-weight: 500 !important; font-size: 0.84rem !important;
+        border: 1px solid var(--border-bright) !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 0.45rem 1.2rem !important;
+        font-weight: 500 !important; font-size: 0.84rem !important;
         transition: all var(--transition) !important;
+        box-shadow: none !important;
     }
-    .stDownloadButton > button:hover { border-color: var(--accent) !important; color: #58a6ff !important; }
-    .stSelectbox [data-baseweb="select"] > div, .stRadio > div, .stCheckbox > label { color: var(--text) !important; }
-    div[data-testid="stExpander"] { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
-    div[data-testid="stExpander"] summary { color: var(--text) !important; }
+    .stDownloadButton > button:hover { border-color: var(--accent) !important; color: #93c5fd !important; }
+
+    /* ── STREAMLIT OVERRIDES ──────────────────────────────────────────── */
+    .stTextInput > div > div {
+        background: var(--surface-2) !important;
+        border: 1px solid var(--border-bright) !important;
+        border-radius: var(--radius-sm) !important;
+        color: var(--text) !important;
+    }
+    .stTextInput > div > div:focus-within {
+        border-color: var(--accent) !important;
+        box-shadow: 0 0 0 3px var(--accent-soft) !important;
+    }
+    .stSelectbox [data-baseweb="select"] > div,
+    .stRadio > div, .stCheckbox > label { color: var(--text) !important; }
+    div[data-testid="stExpander"] {
+        background: var(--surface) !important;
+        border: 1px solid var(--border) !important;
+        border-radius: var(--radius-sm) !important;
+    }
+    div[data-testid="stExpander"] summary { color: var(--text) !important; font-weight: 600 !important; }
     .stSpinner > div { border-color: var(--accent) transparent transparent transparent !important; }
     div[data-testid="stMarkdownContainer"] p,
     div[data-testid="stMarkdownContainer"] li { color: var(--text) !important; }
     div[data-testid="stMarkdownContainer"] h1,
     div[data-testid="stMarkdownContainer"] h2,
     div[data-testid="stMarkdownContainer"] h3 { color: var(--text) !important; }
-    div[data-testid="stMarkdownContainer"] code { background: var(--surface-2) !important; color: #79c0ff !important; border-radius: 4px !important; padding: 1px 5px !important; }
-    div[data-testid="stMarkdownContainer"] pre { background: var(--surface-2) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; }
-    .stAlert { border-radius: 8px !important; }
-    .stCodeBlock { border-radius: 8px !important; }
-    div[data-testid="stFileUploader"] { background: var(--surface) !important; border: 1px dashed var(--border) !important; border-radius: var(--radius) !important; }
+    div[data-testid="stMarkdownContainer"] code {
+        background: var(--surface-3) !important;
+        color: #93c5fd !important;
+        border: 1px solid var(--border) !important;
+        border-radius: 4px !important; padding: 2px 6px !important;
+        font-size: 0.87em !important;
+    }
+    div[data-testid="stMarkdownContainer"] pre {
+        background: var(--surface-2) !important;
+        border: 1px solid var(--border-bright) !important;
+        border-radius: var(--radius-sm) !important;
+        padding: 1rem !important;
+    }
+    .stAlert { border-radius: var(--radius-sm) !important; }
+    .stCodeBlock { border-radius: var(--radius-sm) !important; }
+    div[data-testid="stFileUploader"] {
+        background: var(--surface) !important;
+        border: 1.5px dashed var(--border-bright) !important;
+        border-radius: var(--radius) !important;
+        transition: border-color var(--transition) !important;
+    }
     div[data-testid="stFileUploader"]:hover { border-color: var(--accent) !important; }
     div[data-testid="stFileUploader"] * { color: var(--text) !important; }
     .stSlider [data-testid="stThumbValue"] { background: var(--accent) !important; }
+    div.stRadio > div { gap: 0.4rem !important; }
 
-    /* ── Login screen ── */
-    .login-wrap {
-        max-width: 400px; margin: 6rem auto; text-align: center;
+    /* ── FILE TABLE ───────────────────────────────────────────────────── */
+    .file-row {
+        display: flex; align-items: center; justify-content: space-between;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 0.7rem 1rem; margin: 5px 0;
+        transition: border-color var(--transition), background var(--transition);
     }
+    .file-row:hover { border-color: var(--border-bright); background: var(--surface-2); }
+    .file-name { font-weight: 600; font-size: 0.9rem; color: var(--text) !important; }
+    .file-meta { font-size: 0.78rem; color: var(--text-muted) !important; margin-top: 2px; }
+
+    /* ── HISTORY ──────────────────────────────────────────────────────── */
+    .history-item {
+        background: var(--surface-2); border: 1px solid var(--border);
+        border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin: 5px 0;
+        font-size: 0.87rem;
+    }
+    .history-meta { color: var(--text-muted) !important; font-size: 0.76rem; margin-top: 2px; }
+
+    /* ── LOGIN ────────────────────────────────────────────────────────── */
+    .login-wrap { max-width: 380px; margin: 5rem auto; text-align: center; }
     .login-card {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 16px; padding: 2.5rem 2rem;
-        box-shadow: var(--shadow);
+        background: var(--surface); border: 1px solid var(--border-bright);
+        border-radius: 20px; padding: 2.5rem 2rem;
+        box-shadow: var(--shadow), var(--shadow-glow);
     }
-    .login-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .login-title { font-size: 1.4rem; font-weight: 700; color: var(--text) !important; margin-bottom: 0.3rem; }
-    .login-sub { font-size: 0.85rem; color: var(--text-muted) !important; margin-bottom: 1.5rem; }
+    .login-icon { font-size: 2.5rem; margin-bottom: 0.6rem; }
+    .login-title { font-size: 1.4rem; font-weight: 800; color: var(--text) !important; }
+    .login-sub { font-size: 0.85rem; color: var(--text-secondary) !important; margin: 0.4rem 0 1.5rem; }
 
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    /* ── SCROLLBAR ────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
     </style>
     """, unsafe_allow_html=True)
@@ -2478,10 +2618,11 @@ def display_results(analysis_results: str, file_key: str):
     _vulns_for_grade = extract_vulnerabilities(analysis_results)
     _grade = _calculate_security_grade(_vulns_for_grade)
     st.markdown(f"""
-        <div style="text-align:center;padding:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:1rem;">
-          <div style="font-size:3.5rem;font-weight:800;color:{_grade['color']};">{_grade['grade']}</div>
-          <div style="font-size:1rem;font-weight:600;color:{_grade['color']};margin-top:0.3rem;">{_grade['label']}</div>
-          <div style="font-size:0.85rem;color:var(--text-muted);margin-top:0.3rem;">{_grade['description']}</div>
+        <div class="grade-box" style="--grade-glow: {_grade['color']}26;">
+            <div class="grade-letter" style="color:{_grade['color']};">{_grade['grade']}</div>
+            <div class="grade-divider" style="background:{_grade['color']};"></div>
+            <div class="grade-label" style="color:{_grade['color']};">{_grade['label']}</div>
+            <div class="grade-desc">{_grade['description']}</div>
         </div>
     """, unsafe_allow_html=True)
 
@@ -2509,25 +2650,21 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
         # ── Brand ──────────────────────────────────────────────────────────
         try:
             img_b64 = get_base64_img("logo.png")
-            st.markdown(f"""
-                <div class="sidebar-logo">
-                    <img src="data:image/png;base64,{img_b64}" width="42" style="border-radius:10px;margin-bottom:4px;">
-                    <div class="sidebar-logo-text">CodeGuardianAI</div>
-                    <div class="sidebar-logo-sub">Security Analysis Platform</div>
-                </div>""", unsafe_allow_html=True)
+            icon_html = f'<img src="data:image/png;base64,{img_b64}" style="width:36px;height:36px;border-radius:10px;object-fit:contain;">'
         except Exception:
-            st.markdown("""
-                <div class="sidebar-logo">
-                    <div style="font-size:2rem;">🛡️</div>
-                    <div class="sidebar-logo-text">CodeGuardianAI</div>
-                    <div class="sidebar-logo-sub">Security Analysis Platform</div>
-                </div>""", unsafe_allow_html=True)
-
-        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+            icon_html = '🛡️'
+        st.markdown(f"""
+            <div class="sb-brand">
+                <div class="sb-brand-icon">{icon_html}</div>
+                <div>
+                    <div class="sb-brand-text">CodeGuardianAI</div>
+                    <div class="sb-brand-sub">Security Analysis Platform</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
 
         # ── Connection status ───────────────────────────────────────────────
         if st.session_state.connection_status is None:
-            with st.spinner("Checking connection…"):
+            with st.spinner(""):
                 has_internet = check_internet_connection()
                 can_reach_api = True
                 try:
@@ -2539,75 +2676,70 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
                 }
 
         conn = st.session_state.connection_status
-        net_cls  = "status-online"  if conn['internet'] else "status-offline"
-        api_cls  = "status-online"  if conn['api']      else "status-offline"
-        net_lbl  = "Internet: Connected"    if conn['internet'] else "Internet: Offline"
-        api_lbl  = "API: Reachable"         if conn['api']      else "API: Unreachable"
+        net_cls = "pill-green" if conn['internet'] else "pill-red"
+        api_cls = "pill-green" if conn['api']      else "pill-red"
+        net_lbl = "Online"     if conn['internet'] else "Offline"
+        api_lbl = "API OK"     if conn['api']      else "API Down"
         st.markdown(f"""
-            <div style="display:flex;gap:6px;flex-wrap:wrap;padding:0.1rem 0;">
-                <div class="status-pill {net_cls}"><span class="status-dot"></span>{net_lbl}</div>
-                <div class="status-pill {api_cls}"><span class="status-dot"></span>{api_lbl}</div>
+            <div class="sb-status-row">
+                <div class="sb-pill {net_cls}"><span class="sb-pill-dot"></span>{net_lbl}</div>
+                <div class="sb-pill {api_cls}"><span class="sb-pill-dot"></span>{api_lbl}</div>
             </div>""", unsafe_allow_html=True)
 
-        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+        st.markdown('<hr class="sb-divider">', unsafe_allow_html=True)
 
-        # ── API provider ────────────────────────────────────────────────────
-        st.markdown('<div class="sidebar-section-label">AI Provider</div>', unsafe_allow_html=True)
+        # ── AI Provider ─────────────────────────────────────────────────────
+        st.markdown('<div class="sb-section">AI Provider</div>', unsafe_allow_html=True)
 
-        # Smart default: prefer whichever key is actually configured
         _oai_key = os.getenv("OPENAI_API_KEY", "")
         _dsk_key = os.getenv("DEEPSEEK_API_KEY", "")
         _placeholder = ("your_openai_api_key_here", "your_deepseek_api_key_here", "")
         _has_openai   = bool(_oai_key and _oai_key not in _placeholder)
         _has_deepseek = bool(_dsk_key and _dsk_key not in _placeholder)
-        _default_api  = "OpenAI" if _has_openai else ("Deepseek" if _has_deepseek else "OpenAI")
-        _default_idx  = 0 if _default_api == "OpenAI" else 1
+        _default_idx  = 0 if _has_openai else (1 if _has_deepseek else 0)
 
         api_choice = st.selectbox(
-            "API Provider",
-            ["OpenAI", "Deepseek"],
-            index=_default_idx,
-            label_visibility="collapsed",
-            help="Select which AI provider to use for analysis",
+            "API Provider", ["OpenAI", "Deepseek"],
+            index=_default_idx, label_visibility="collapsed",
+            help="Select which AI provider to use",
         )
         st.session_state.selected_api = api_choice
 
-        # Warn if the chosen provider has no key configured
         _chosen_key = _oai_key if api_choice == "OpenAI" else _dsk_key
         if not _chosen_key or _chosen_key in _placeholder:
-            st.warning(f"⚠️ No {api_choice} API key found in `.env`", icon=None)
+            st.markdown(f'<div class="sb-pill pill-red" style="margin:4px 0;font-size:0.74rem;">&#9888; No {api_choice} key in .env</div>', unsafe_allow_html=True)
 
-        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+        st.markdown('<hr class="sb-divider">', unsafe_allow_html=True)
 
-        # ── Analysis settings ───────────────────────────────────────────────
-        st.markdown('<div class="sidebar-section-label">Analysis Settings</div>', unsafe_allow_html=True)
+        # ── Analysis Settings ───────────────────────────────────────────────
+        st.markdown('<div class="sb-section">Analysis Settings</div>', unsafe_allow_html=True)
 
         confidence_level = st.select_slider(
             "Confidence Threshold",
             options=["Low", "Medium", "High"],
             value=st.session_state.confidence_level,
-            help="Higher = fewer false positives, but might miss subtle issues",
+            help="Higher = fewer false positives",
         )
         st.session_state.confidence_level = confidence_level
 
         verify_toggle = st.checkbox(
             "Verify findings (batch)",
             value=st.session_state.verify_vulnerabilities,
-            help="Runs a second-pass verification in a single API call to reduce false positives.",
+            help="Second-pass AI verification to reduce false positives.",
         )
         st.session_state.verify_vulnerabilities = verify_toggle
 
-        with st.expander("Confidence level guide"):
+        with st.expander("ℹ Threshold guide"):
             st.markdown("""
-            - **Low** — Shows all potential issues; may include false positives
-            - **Medium** — Balanced; filters low-confidence findings
-            - **High** — Only highly confident findings; minimises noise
+**Low** — All potential issues, including uncertain ones
+**Medium** — Balanced; filters low-confidence findings
+**High** — Only high-confidence findings; minimal noise
             """)
 
-        st.markdown('<hr class="sidebar-divider">', unsafe_allow_html=True)
+        st.markdown('<hr class="sb-divider">', unsafe_allow_html=True)
 
         # ── Upload ──────────────────────────────────────────────────────────
-        st.markdown('<div class="sidebar-section-label">Upload Code</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sb-section">Upload Code</div>', unsafe_allow_html=True)
 
         upload_type = st.radio(
             "Upload type",
@@ -2617,26 +2749,24 @@ def _render_sidebar(analyzer: SecurityAnalyzer):
 
         if upload_type == "Single File":
             uploaded_file = st.file_uploader(
-                "Drop a file here",
-                type=["php", "txt", "py", "js", "java", "cpp", "cs"],
-                help="Max 5 MB",
+                "Drop file", type=["php", "txt", "py", "js", "java", "cpp", "cs"],
+                help="Max 5 MB — PHP, Python, JS, Java, C++, C#",
                 label_visibility="collapsed",
             )
             if uploaded_file:
                 process_single_file(uploaded_file)
         else:
             uploaded_folder = st.file_uploader(
-                "Drop a ZIP here",
-                type="zip",
-                help="Upload a zipped directory of code files",
+                "Drop ZIP", type="zip",
+                help="Upload a zipped project directory",
                 label_visibility="collapsed",
             )
             if uploaded_folder:
                 folder_contents, file_metadata = process_uploaded_folder(uploaded_folder)
                 if folder_contents:
-                    st.markdown('<div class="sidebar-section-label" style="margin-top:0.6rem;">Loaded Files</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="sb-section" style="margin-top:0.5rem;">Loaded Files</div>', unsafe_allow_html=True)
                     for fname, meta in file_metadata.items():
-                        st.caption(f"📄 {fname} — {meta['size_kb']} KB")
+                        st.caption(f"📄 {fname.split('/')[-1]} — {meta['size_kb']} KB")
 
 
 def _render_analysis_panel(analyzer: SecurityAnalyzer, code: str, filename: str):
@@ -2694,78 +2824,94 @@ def main():
         img_b64 = get_base64_img("logo.png")
         logo_html = f'<img src="data:image/png;base64,{img_b64}" class="hero-logo">'
     except Exception:
-        logo_html = '<div style="font-size:3rem;margin-bottom:0.5rem;">🛡️</div>'
+        logo_html = '<div style="font-size:3.5rem;margin-bottom:0.8rem;filter:drop-shadow(0 0 16px rgba(59,130,246,0.5));">🛡️</div>'
 
     st.markdown(f"""
         <div class="hero">
             {logo_html}
-            <div class="hero-badge">AI-Powered · Multi-Language · v2.1</div>
-            <h1 class="hero-title">Code<span>Guardian</span>AI</h1>
+            <div class="hero-eyebrow">
+                <span class="hero-eyebrow-dot"></span>
+                AI-Powered · OWASP Top 10 · Multi-Language
+            </div>
+            <h1 class="hero-title">CodeGuardianAI</h1>
             <p class="hero-subtitle">
-                Automated security vulnerability analysis powered by OpenAI and Deepseek.
-                Upload your code and get a detailed, actionable security report in seconds.
+                Upload your code and receive a complete security audit in seconds —
+                with CWE classification, proof-of-concept exploits, and ready-to-use fixes.
             </p>
+            <div class="hero-stats">
+                <div class="hero-stat"><strong>29</strong> detection rules</div>
+                <div class="hero-stat"><strong>6</strong> languages</div>
+                <div class="hero-stat"><strong>OWASP</strong> Top 10 2021</div>
+                <div class="hero-stat"><strong>AI</strong> + Deterministic</div>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # ── Info cards ──────────────────────────────────────────────────────────
+    # ── Feature cards ──────────────────────────────────────────────────────
     st.markdown("""
-        <div class="info-grid">
-            <div class="info-card">
-                <div class="info-card-title">🔍 What this tool does</div>
-                <div class="info-row"><span class="info-check">✓</span> Scans every line for security vulnerabilities</div>
-                <div class="info-row"><span class="info-check">✓</span> Pinpoints exact locations with code snippets</div>
-                <div class="info-row"><span class="info-check">✓</span> Provides CWE / OWASP classification</div>
-                <div class="info-row"><span class="info-check">✓</span> Gives minimal, actionable fix suggestions</div>
-                <div class="info-row"><span class="info-check">✓</span> Batch-verifies findings to cut false positives</div>
+        <div class="feat-grid">
+            <div class="feat-card">
+                <div class="feat-icon">🔍</div>
+                <div class="feat-title">Deep Code Analysis</div>
+                <div class="feat-desc">Every line scanned with AI + 29 deterministic rules. Traces data from source to dangerous sink.</div>
             </div>
-            <div class="info-card">
-                <div class="info-card-title">⚠️ Severity levels</div>
-                <div class="info-row"><span class="sev-badge sev-critical">● Critical</span> Direct system compromise — fix now</div>
-                <div class="info-row"><span class="sev-badge sev-high">● High</span> Significant impact — fix soon</div>
-                <div class="info-row"><span class="sev-badge sev-medium">● Medium</span> Moderate impact — plan to address</div>
-                <div class="info-row"><span class="sev-badge sev-low">● Low</span> Limited impact — fix when possible</div>
+            <div class="feat-card">
+                <div class="feat-icon">🎯</div>
+                <div class="feat-title">PoC Exploits Included</div>
+                <div class="feat-desc">Each finding includes a working proof-of-concept and actionable fix code — not just warnings.</div>
+            </div>
+            <div class="feat-card">
+                <div class="feat-icon">📊</div>
+                <div class="feat-title">Security Grade A–F</div>
+                <div class="feat-desc">Instant risk score with PDF report ready to share with your team or client.</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # ── Severity legend ────────────────────────────────────────────────────
+    st.markdown("""
+        <div class="sev-legend">
+            <div class="sev-card sev-card-critical">
+                <div class="sev-card-label">🔴 Critical</div>
+                <div class="sev-card-desc">Direct compromise — fix immediately</div>
+            </div>
+            <div class="sev-card sev-card-high">
+                <div class="sev-card-label">🟠 High</div>
+                <div class="sev-card-desc">Significant impact — fix soon</div>
+            </div>
+            <div class="sev-card sev-card-medium">
+                <div class="sev-card-label">🟡 Medium</div>
+                <div class="sev-card-desc">Moderate risk — plan to address</div>
+            </div>
+            <div class="sev-card sev-card-low">
+                <div class="sev-card-label">🟢 Low</div>
+                <div class="sev-card-desc">Minor issue — fix when possible</div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
     # ── Main content ────────────────────────────────────────────────────────
     if st.session_state.folder_contents:
-        st.markdown("""
-            <div style="font-size:0.72rem;font-weight:600;text-transform:uppercase;
-                        letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.6rem;">
-                Project Files
-            </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
-            <div class="file-table-header">
-                <span>File</span><span>Status</span><span>Action</span>
-            </div>
-        """, unsafe_allow_html=True)
-
-        for filename, content in st.session_state.folder_contents.items():
-            metadata = st.session_state.file_metadata[filename]
-            status_html = (
-                '<span class="sev-badge sev-low">✓ Scanned</span>'
-                if metadata['scanned']
-                else '<span class="sev-badge sev-medium">Pending</span>'
-            )
-            st.markdown(f"""
-                <div class="file-row" style="display:grid;grid-template-columns:3fr 1fr 1fr;align-items:center;">
-                    <div>
-                        <div class="file-name">📄 {filename}</div>
-                        <div class="file-meta">{metadata['size_kb']} KB · {metadata['lines']} lines · .{metadata['extension']}</div>
+        st.markdown('<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:0.6rem;">Project Files</div>', unsafe_allow_html=True)
+        for filename in st.session_state.folder_contents.keys():
+            meta = st.session_state.file_metadata.get(filename, {})
+            scanned = meta.get('scanned', False)
+            status_badge = '<span class="sev-badge sev-low">&#10003; scanned</span>' if scanned else '<span style="color:var(--text-muted);font-size:0.78rem;">pending</span>'
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"""
+                    <div class="file-row">
+                        <div>
+                            <div class="file-name">📄 {filename.split('/')[-1]}</div>
+                            <div class="file-meta">{meta.get('lines',0)} lines · {meta.get('size_kb',0)} KB</div>
+                        </div>
+                        {status_badge}
                     </div>
-                    <div>{status_html}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            if st.button("Analyze →", key=f"analyze_{filename}"):
-                st.session_state.current_file = filename
-                st.session_state.user_code = content
-                metadata['scanned'] = True
-                metadata['last_scan'] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                st.rerun()
+                """, unsafe_allow_html=True)
+            with col2:
+                if st.button("Scan", key=f"scan_{filename}"):
+                    st.session_state.user_code = st.session_state.folder_contents[filename]
+                    st.session_state.current_file = filename
 
         if st.session_state.current_file and st.session_state.user_code:
             st.markdown("---")
@@ -2783,9 +2929,9 @@ def main():
     else:
         st.markdown("""
             <div style="text-align:center;padding:4rem 2rem;color:var(--text-muted);">
-                <div style="font-size:3rem;margin-bottom:1rem;">📂</div>
-                <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.4rem;">No code loaded yet</div>
-                <div style="font-size:0.88rem;">Upload a file or ZIP archive using the sidebar to begin analysis.</div>
+                <div style="font-size:3.5rem;margin-bottom:1rem;opacity:0.3;">🔐</div>
+                <div style="font-size:1.1rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.5rem;">No code loaded yet</div>
+                <div style="font-size:0.9rem;">Upload a file using the sidebar to begin your security analysis.</div>
             </div>
         """, unsafe_allow_html=True)
 
