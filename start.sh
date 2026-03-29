@@ -98,13 +98,18 @@ mkdir -p logs cache uploads reports
 
 # ── 6. Launch ────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${GREEN}${BOLD}  App starting at: http://localhost:8501 ${RESET}"
-echo -e "${GREEN}${BOLD}  Press Ctrl+C to stop.                  ${RESET}"
-echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+# Detect public IP for display
+SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "your-server-ip")
+
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "${GREEN}${BOLD}  Local:   http://localhost:8501                  ${RESET}"
+echo -e "${GREEN}${BOLD}  Network: http://${SERVER_IP}:8501               ${RESET}"
+echo -e "${GREEN}${BOLD}  Press Ctrl+C to stop.                           ${RESET}"
+echo -e "${GREEN}${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
 
 streamlit run app.py \
     --server.headless true \
     --browser.gatherUsageStats false \
-    --server.port 8501
+    --server.port 8501 \
+    --server.address 0.0.0.0
