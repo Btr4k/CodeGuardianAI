@@ -1382,12 +1382,37 @@ def verify_php_security(code: str) -> str:
         })
 
     # ── 3. SQL injection — string concatenation into queries ──────────────
+    # Pattern A: mysql_query("SELECT ... " . $var) or mysql_query("SELECT...$var")
     sqli_pattern = r'(?:mysql[i]?_query|->query|->prepare\s*\(\s*"[^"]*\.\s*\$|PDO::query)\s*\(\s*["\'][^"\']*(?:\.\s*\$|\$[a-zA-Z_]\w*(?:\[.*?\])?)[^"\']*["\']'
     snippet, loc = _first_line(sqli_pattern)
     if not snippet:
-        # Also catch direct variable interpolation in query strings
+        # Pattern B: direct variable interpolation in query string
         sqli_pattern2 = r'(?:mysql[i]?_query|->query|->prepare)\s*\(\s*"[^"]*\$(?:_(?:GET|POST|REQUEST|COOKIE)|[a-zA-Z_]\w*)[^"]*"'
         snippet, loc = _first_line(sqli_pattern2)
+    if not snippet:
+        # Pattern C: taint trace — $tainted = $_GET[..]; $query = "...{$tainted}..."; mysql_query($query)
+        # Step 1: find variables assigned from user input
+        taint_sources = re.findall(
+            r'(\$\w+)\s*=\s*\$_(?:GET|POST|REQUEST|COOKIE|SESSION)\s*\[',
+            clean, re.IGNORECASE
+        )
+        for tainted_var in taint_sources:
+            escaped_var = re.escape(tainted_var)
+            # Step 2: find a query string containing that variable
+            query_var_m = re.search(
+                rf'(\$\w+)\s*=\s*"[^"]*{escaped_var}[^"]*"',
+                clean, re.IGNORECASE
+            )
+            if query_var_m:
+                query_var = query_var_m.group(1)
+                # Step 3: confirm query variable is passed to a DB function
+                if re.search(
+                    rf'(?:mysql[i]?_query|->query|->execute)\s*\(\s*{re.escape(query_var)}',
+                    clean, re.IGNORECASE
+                ):
+                    snippet = query_var_m.group(0)[:200].strip()
+                    loc = f"Line ~{code[:query_var_m.start()].count(chr(10)) + 1}"
+                    break
     if snippet:
         _add({
             "type": "SQL Injection",
